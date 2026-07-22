@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'app_colors.dart';
 import 'animated_press_button.dart';
 import 'board_preview.dart';
+import 'difficulty_select_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -44,7 +45,9 @@ class HomeScreen extends StatelessWidget {
                         textColor: AppColors.playerDeep,
                         glowColor: AppColors.playerStart,
                         onTap: () {
-                          // TODO: navigate to game screen (AI mode)
+                          Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => const DifficultySelectScreen()),
+                          );
                         },
                       ),
                       const SizedBox(height: 14),
