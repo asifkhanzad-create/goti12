@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'app_colors.dart';
 import 'board_point.dart';
@@ -28,7 +29,10 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
   bool _chainInProgress = false;
 
   late final AnimationController _hopController;
-  static const _hopDuration = Duration(milliseconds: 260);
+  /// Duration for one orthogonal grid step (distance 1.0). Longer hops
+  /// scale from this with a mild distance factor (see [_hopDurationFor]).
+  static const _unitHopDuration = Duration(milliseconds: 250);
+  static const _aiChainGap = Duration(milliseconds: 200); // beat between chained AI kills
 
   // Mid-hop animation state: the piece currently sliding, and any pieces
   // fading out as captured on this specific hop. Rendering reads these
@@ -43,7 +47,7 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
     super.initState();
     _state = GameState.initial(firstTurn: Owner.player);
     _aiEngine = AiEngine(widget.difficulty);
-    _hopController = AnimationController(vsync: this, duration: _hopDuration);
+    _hopController = AnimationController(vsync: this, duration: _unitHopDuration);
     _maybeTriggerAi();
   }
 
@@ -96,14 +100,18 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
       _selectedIndex = null;
       _chainInProgress = false;
     });
-    await _animateHop(from, MoveStep(to: to));
+    await _animateHop(from, MoveStep(to: to), _hopDurationFor(from, to));
     setState(() => _state.endTurn());
     _maybeTriggerAi();
   }
 
   Future<void> _playerCaptureHop(Move singleHop) async {
     final from = singleHop.from;
-    await _animateHop(from, MoveStep(to: singleHop.to, captured: singleHop.captured));
+    await _animateHop(
+      from,
+      MoveStep(to: singleHop.to, captured: singleHop.captured),
+      _hopDurationFor(from, singleHop.to),
+    );
 
     if (_state.phase != GamePhase.playing) {
       setState(() {
@@ -138,7 +146,7 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
   // player's — nothing about how it's applied is different or hidden.
   void _maybeTriggerAi() {
     if (_state.phase != GamePhase.playing || _state.turn != Owner.ai) return;
-    Future.delayed(const Duration(milliseconds: 500), () async {
+    Future.delayed(const Duration(milliseconds: 650), () async {
       if (!mounted) return;
       if (_state.phase != GamePhase.playing || _state.turn != Owner.ai) return;
       final move = _aiEngine.chooseMove(_state);
@@ -149,20 +157,28 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
     });
   }
 
-  /// Plays every hop of [move] in sequence, then ends the turn.
+  /// Plays every hop of [move] in sequence, then ends the turn. Uses the
+  /// same constant-speed hop timing as the player, with a brief pause
+  /// between hops so a multi-capture chain reads as a sequence of kills.
   Future<void> _animateAndApply(Move move) async {
     int current = move.from;
-    for (final step in move.effectiveSteps) {
-      await _animateHop(current, step);
+    final steps = move.effectiveSteps;
+    for (var i = 0; i < steps.length; i++) {
+      final hopDuration = _hopDurationFor(current, steps[i].to);
+      await _animateHop(current, steps[i], hopDuration);
       if (_state.phase != GamePhase.playing) return;
-      current = step.to;
+      current = steps[i].to;
+      if (i < steps.length - 1) {
+        await Future.delayed(_aiChainGap);
+      }
     }
     setState(() => _state.endTurn());
   }
 
   /// Slides the piece at [from] to [step.to], fading out anything captured
   /// on this hop, then commits the actual board mutation.
-  Future<void> _animateHop(int from, MoveStep step) async {
+  Future<void> _animateHop(int from, MoveStep step, Duration duration) async {
+    _hopController.duration = duration;
     setState(() {
       _animFrom = from;
       _animTo = step.to;
@@ -177,6 +193,33 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
       _animOwner = null;
       _animCaptured = const [];
     });
+  }
+
+  /// Duration for a hop that *feels* consistent to the eye.
+  ///
+  /// Pure constant-time (always 250ms) makes long capture paths race.
+  /// Pure constant-speed (duration ∝ distance) makes captures drag —
+  /// a 2-step jump lasts twice as long and easeInOut spends more real
+  /// time crawling at the start/end, so it *looks* slower than a normal
+  /// step even when average velocity matches.
+  ///
+  /// Sublinear scaling is the middle ground: longer hops get a bit more
+  /// time (so they don't zip), but not a full 1:1 with distance.
+  Duration _hopDurationFor(int from, int to) {
+    final fp = BoardPoint(from % 5, from ~/ 5);
+    final tp = BoardPoint(to % 5, to ~/ 5);
+    final dx = (tp.col - fp.col).toDouble();
+    final dy = (tp.row - fp.row).toDouble();
+    final dist = math.sqrt(dx * dx + dy * dy);
+    final units = dist < 0.01 ? 1.0 : dist;
+    // dist 1.0 → 1.00× (normal H/V)
+    // dist √2  → ~1.20× (diagonal plain)
+    // dist 2.0 → ~1.35× (H/V capture)
+    // dist 2√2 → ~1.55× (diagonal capture)
+    final scale = math.pow(units, 0.45).toDouble();
+    return Duration(
+      milliseconds: (_unitHopDuration.inMilliseconds * scale).round(),
+    );
   }
 
   @override
@@ -413,7 +456,21 @@ class _PieceState extends State<_Piece> with SingleTickerProviderStateMixin {
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
-    )..repeat(reverse: true);
+    );
+    if (widget.isSelected) {
+      _pulseController.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _Piece oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isSelected && !oldWidget.isSelected) {
+      _pulseController.repeat(reverse: true);
+    } else if (!widget.isSelected && oldWidget.isSelected) {
+      _pulseController.stop();
+      _pulseController.value = 0.0;
+    }
   }
 
   @override
@@ -442,12 +499,11 @@ class _PieceState extends State<_Piece> with SingleTickerProviderStateMixin {
       );
     }
 
-    // Selected piece: slow pulsing size + glow, no static outline.
     return AnimatedBuilder(
       animation: _pulseController,
       builder: (context, _) {
-        final t = _pulseController.value; // 0..1
-        final scale = 1.0 + (t * 0.22); // gently grows/shrinks
+        final t = _pulseController.value;
+        final scale = 1.0 + (t * 0.22);
         final glowAlpha = 0.4 + (t * 0.4);
         return Center(
           child: Transform.scale(
