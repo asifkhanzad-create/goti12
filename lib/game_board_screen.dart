@@ -1,5 +1,7 @@
 import 'dart:math' as math;
+import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
+import 'animated_press_button.dart';
 import 'app_colors.dart';
 import 'board_point.dart';
 import 'game_state.dart';
@@ -29,6 +31,8 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
   bool _chainInProgress = false;
 
   late final AnimationController _hopController;
+  late final ConfettiController _confettiController;
+  late final AnimationController _shakeController;
   /// Duration for one orthogonal grid step (distance 1.0). Longer hops
   /// scale from this with a mild distance factor (see [_hopDurationFor]).
   static const _unitHopDuration = Duration(milliseconds: 250);
@@ -42,18 +46,28 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
   Owner? _animOwner;
   List<int> _animCaptured = const [];
 
+  /// Ensures win/lose FX only fire once per finished game.
+  bool _endFxPlayed = false;
+
   @override
   void initState() {
     super.initState();
     _state = GameState.initial(firstTurn: Owner.player);
     _aiEngine = AiEngine(widget.difficulty);
     _hopController = AnimationController(vsync: this, duration: _unitHopDuration);
+    _confettiController = ConfettiController(duration: const Duration(seconds: 3));
+    _shakeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 420),
+    );
     _maybeTriggerAi();
   }
 
   @override
   void dispose() {
     _hopController.dispose();
+    _confettiController.dispose();
+    _shakeController.dispose();
     super.dispose();
   }
 
@@ -102,6 +116,7 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
     });
     await _animateHop(from, MoveStep(to: to), _hopDurationFor(from, to));
     setState(() => _state.endTurn());
+    _maybePlayEndgameFx();
     _maybeTriggerAi();
   }
 
@@ -118,6 +133,7 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
         _selectedIndex = null;
         _chainInProgress = false;
       });
+      _maybePlayEndgameFx();
       return;
     }
 
@@ -136,6 +152,7 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
       _selectedIndex = null;
       _chainInProgress = false;
     });
+    _maybePlayEndgameFx();
     _maybeTriggerAi();
   }
 
@@ -166,13 +183,34 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
     for (var i = 0; i < steps.length; i++) {
       final hopDuration = _hopDurationFor(current, steps[i].to);
       await _animateHop(current, steps[i], hopDuration);
-      if (_state.phase != GamePhase.playing) return;
+      if (_state.phase != GamePhase.playing) {
+        _maybePlayEndgameFx();
+        return;
+      }
       current = steps[i].to;
       if (i < steps.length - 1) {
         await Future.delayed(_aiChainGap);
       }
     }
     setState(() => _state.endTurn());
+    _maybePlayEndgameFx();
+  }
+
+  /// Fires win confetti or lose dim+shake once when the game ends.
+  void _maybePlayEndgameFx() {
+    if (_endFxPlayed || !mounted) return;
+    switch (_state.phase) {
+      case GamePhase.playerWon:
+        _endFxPlayed = true;
+        _confettiController.play();
+        setState(() {});
+      case GamePhase.aiWon:
+        _endFxPlayed = true;
+        _shakeController.forward(from: 0);
+        setState(() {});
+      case GamePhase.playing:
+        break;
+    }
   }
 
   /// Slides the piece at [from] to [step.to], fading out anything captured
@@ -222,8 +260,39 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
     );
   }
 
+  bool get _isEndgame =>
+      _state.phase == GamePhase.playerWon || _state.phase == GamePhase.aiWon;
+
+  /// Fresh game on the same difficulty — stays on this screen.
+  void _playAgain() {
+    _hopController.stop();
+    _hopController.reset();
+    _confettiController.stop(clearAllParticles: true);
+    _shakeController.stop();
+    _shakeController.reset();
+    setState(() {
+      _state = GameState.initial(firstTurn: Owner.player);
+      _aiEngine = AiEngine(widget.difficulty);
+      _selectedIndex = null;
+      _chainInProgress = false;
+      _animFrom = null;
+      _animTo = null;
+      _animOwner = null;
+      _animCaptured = const [];
+      _endFxPlayed = false;
+    });
+    _maybeTriggerAi();
+  }
+
+  /// Back to difficulty select (under this route on the nav stack).
+  void _changeDifficulty() {
+    Navigator.of(context).pop();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final lost = _state.phase == GamePhase.aiWon;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -241,60 +310,173 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
         ),
         centerTitle: true,
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            const SizedBox(height: 8),
-            _StatusBanner(state: _state),
-            Expanded(
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: AspectRatio(
-                    aspectRatio: 1,
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final boardSize = constraints.maxWidth;
-                        return AnimatedBuilder(
-                          animation: _hopController,
-                          builder: (context, _) {
-                            final t = _hopController.value;
-                            return Stack(
-                              clipBehavior: Clip.none,
-                              children: [
-                                CustomPaint(
-                                  size: Size(boardSize, boardSize),
-                                  painter: _BoardLinesPainter(),
+      body: Stack(
+        children: [
+          SafeArea(
+            child: Column(
+              children: [
+                const SizedBox(height: 8),
+                // Banner stays above the lose dim so "YOU LOST" stays readable.
+                _StatusBanner(state: _state),
+                Expanded(
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: Stack(
+                          children: [
+                            // Board area — shakes on loss.
+                            AnimatedBuilder(
+                              animation: _shakeController,
+                              builder: (context, child) {
+                                final t = _shakeController.value;
+                                final dx = lost && t > 0 && t < 1
+                                    ? math.sin(t * math.pi * 6) * 10 * (1 - t)
+                                    : 0.0;
+                                return Transform.translate(
+                                  offset: Offset(dx, 0),
+                                  child: child,
+                                );
+                              },
+                              child: Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 20,
+                                  ),
+                                  child: AspectRatio(
+                                    aspectRatio: 1,
+                                    child: LayoutBuilder(
+                                      builder: (context, constraints) {
+                                        final boardSize = constraints.maxWidth;
+                                        return AnimatedBuilder(
+                                          animation: _hopController,
+                                          builder: (context, _) {
+                                            final t = _hopController.value;
+                                            return Stack(
+                                              clipBehavior: Clip.none,
+                                              children: [
+                                                CustomPaint(
+                                                  size: Size(
+                                                    boardSize,
+                                                    boardSize,
+                                                  ),
+                                                  painter: _BoardLinesPainter(),
+                                                ),
+                                                for (final p
+                                                    in BoardGraph.points)
+                                                  _PositionedPoint(
+                                                    point: p,
+                                                    size: boardSize,
+                                                    owner: p.index == _animFrom
+                                                        ? null
+                                                        : _state.ownerAt(
+                                                            p.index,
+                                                          ),
+                                                    isSelected: _selectedIndex ==
+                                                        p.index,
+                                                    fadeProgress:
+                                                        _animCaptured.contains(
+                                                          p.index,
+                                                        )
+                                                            ? t
+                                                            : 0.0,
+                                                    onTap: () =>
+                                                        _onPointTap(p.index),
+                                                  ),
+                                                if (_animFrom != null &&
+                                                    _animOwner != null)
+                                                  _SlidingPiece(
+                                                    from: BoardPoint(
+                                                      _animFrom! % 5,
+                                                      _animFrom! ~/ 5,
+                                                    ),
+                                                    to: BoardPoint(
+                                                      _animTo! % 5,
+                                                      _animTo! ~/ 5,
+                                                    ),
+                                                    boardSize: boardSize,
+                                                    owner: _animOwner!,
+                                                    progress: t,
+                                                  ),
+                                              ],
+                                            );
+                                          },
+                                        );
+                                      },
+                                    ),
+                                  ),
                                 ),
-                                for (final p in BoardGraph.points)
-                                  _PositionedPoint(
-                                    point: p,
-                                    size: boardSize,
-                                    owner: p.index == _animFrom ? null : _state.ownerAt(p.index),
-                                    isSelected: _selectedIndex == p.index,
-                                    fadeProgress: _animCaptured.contains(p.index) ? t : 0.0,
-                                    onTap: () => _onPointTap(p.index),
+                              ),
+                            ),
+
+                            // Dim the board area when the player loses.
+                            if (lost)
+                              IgnorePointer(
+                                child: Container(
+                                  color: AppColors.background.withValues(
+                                    alpha: 0.55,
                                   ),
-                                if (_animFrom != null && _animOwner != null)
-                                  _SlidingPiece(
-                                    from: BoardPoint(_animFrom! % 5, _animFrom! ~/ 5),
-                                    to: BoardPoint(_animTo! % 5, _animTo! ~/ 5),
-                                    boardSize: boardSize,
-                                    owner: _animOwner!,
-                                    progress: t,
-                                  ),
-                              ],
-                            );
-                          },
-                        );
-                      },
-                    ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+
+                      // End-game actions — only after win/lose, under the board.
+                      if (_isEndgame)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(24, 0, 24, 64),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              AnimatedPressButton(
+                                label: 'Play again',
+                                gradient: AppColors.playerGradient,
+                                textColor: AppColors.playerDeep,
+                                glowColor: AppColors.playerStart,
+                                onTap: _playAgain,
+                              ),
+                              const SizedBox(height: 12),
+                              AnimatedPressButton(
+                                label: 'Change difficulty',
+                                gradient: AppColors.aiGradient,
+                                textColor: AppColors.aiDeep,
+                                glowColor: AppColors.aiStart,
+                                onTap: _changeDifficulty,
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
                   ),
                 ),
+              ],
+            ),
+          ),
+
+          // Full-screen confetti when the player wins (non-blocking).
+          Align(
+            alignment: Alignment.topCenter,
+            child: IgnorePointer(
+              child: ConfettiWidget(
+                confettiController: _confettiController,
+                blastDirectionality: BlastDirectionality.explosive,
+                emissionFrequency: 0.08,
+                numberOfParticles: 22,
+                maxBlastForce: 28,
+                minBlastForce: 10,
+                gravity: 0.18,
+                shouldLoop: false,
+                colors: const [
+                  AppColors.playerStart,
+                  AppColors.playerEnd,
+                  AppColors.aiStart,
+                  Colors.white,
+                  Color(0xFFA78BFA),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -312,37 +494,147 @@ Offset boardPointCenter(BoardPoint point, double size) {
   );
 }
 
-class _StatusBanner extends StatelessWidget {
+class _StatusBanner extends StatefulWidget {
   const _StatusBanner({required this.state});
 
   final GameState state;
+
+  @override
+  State<_StatusBanner> createState() => _StatusBannerState();
+}
+
+class _StatusBannerState extends State<_StatusBanner>
+    with TickerProviderStateMixin {
+  late final AnimationController _entranceController;
+  late final AnimationController _pulseController;
+  late final Animation<double> _scale;
+  late final Animation<double> _pulse;
+
+  /// Snapshot of phase — GameState is mutated in place, so we cannot rely on
+  /// `oldWidget.state.phase` in [didUpdateWidget] (same object, already updated).
+  late GamePhase _lastPhase;
+
+  bool get _isEndgame =>
+      widget.state.phase == GamePhase.playerWon ||
+      widget.state.phase == GamePhase.aiWon;
+
+  @override
+  void initState() {
+    super.initState();
+    _lastPhase = widget.state.phase;
+    _entranceController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 550),
+    );
+    // Scale-only entrance (no opacity fade) so text stays visible even if
+    // the controller fails to start.
+    _scale = Tween<double>(begin: 0.65, end: 1.0).animate(
+      CurvedAnimation(parent: _entranceController, curve: Curves.elasticOut),
+    );
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
+    _pulse = Tween<double>(begin: 1.0, end: 1.06).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
+    if (_isEndgame) {
+      _startEndgameAnim();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _StatusBanner oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final phase = widget.state.phase;
+    final wasEnd = _lastPhase == GamePhase.playerWon ||
+        _lastPhase == GamePhase.aiWon;
+    final isEnd =
+        phase == GamePhase.playerWon || phase == GamePhase.aiWon;
+
+    if (isEnd && !wasEnd) {
+      _startEndgameAnim();
+    } else if (!isEnd && wasEnd) {
+      _entranceController.stop();
+      _entranceController.reset();
+      _pulseController.stop();
+      _pulseController.reset();
+    }
+    _lastPhase = phase;
+  }
+
+  void _startEndgameAnim() {
+    _pulseController.stop();
+    _pulseController.reset();
+    _entranceController.forward(from: 0).then((_) {
+      if (!mounted || !_isEndgame) return;
+      _pulseController.repeat(reverse: true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _entranceController.dispose();
+    _pulseController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     String label;
     Color color;
 
-    switch (state.phase) {
+    switch (widget.state.phase) {
       case GamePhase.playerWon:
-        label = 'YOU WON';
+        label = 'YOU WIN';
         color = AppColors.playerStart;
         break;
       case GamePhase.aiWon:
-        label = 'AI WON';
+        label = 'YOU LOST';
         color = AppColors.aiStart;
         break;
       case GamePhase.playing:
-        final isPlayer = state.turn == Owner.player;
+        final isPlayer = widget.state.turn == Owner.player;
         label = isPlayer ? 'YOUR TURN' : "AI IS THINKING…";
         color = isPlayer ? AppColors.playerStart : AppColors.aiStart;
         break;
     }
 
+    if (!_isEndgame) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: color,
+            fontSize: 13,
+            letterSpacing: 1.5,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+    }
+
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Text(
-        label,
-        style: TextStyle(color: color, fontSize: 13, letterSpacing: 1.5, fontWeight: FontWeight.w600),
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: AnimatedBuilder(
+        animation: Listenable.merge([_entranceController, _pulseController]),
+        builder: (context, child) {
+          return Transform.scale(
+            scale: _scale.value * _pulse.value,
+            child: child,
+          );
+        },
+        child: Text(
+          label,
+          style: TextStyle(
+            color: color,
+            fontSize: 28,
+            letterSpacing: 2.0,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ),
     );
   }
