@@ -273,14 +273,16 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
     switch (_state.phase) {
       case GamePhase.playerWon:
         _endFxPlayed = true;
+        SoundManager.instance.playWin();
         _confettiController.play();
         setState(() {});
-      case GamePhase.aiWon:
+            case GamePhase.aiWon:
         _endFxPlayed = true;
         if (widget.isLocal) {
-          // Local: amber win is still a win for someone — celebrate, no "you lost".
+          SoundManager.instance.playWin();
           _confettiController.play();
         } else {
+          SoundManager.instance.playLose();
           _shakeController.forward(from: 0);
         }
         setState(() {});

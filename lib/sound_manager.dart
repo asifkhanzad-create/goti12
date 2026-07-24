@@ -8,7 +8,9 @@ class SoundManager {
 
   AudioSource? _slideSource;
   AudioSource? _captureSource;
-  AudioSource? _tapSource;   // <-- ADD
+  AudioSource? _tapSource;
+  AudioSource? _winSource;
+  AudioSource? _loseSource;
   bool _initialized = false;
 
   Future<void> init() async {
@@ -17,7 +19,9 @@ class SoundManager {
       await SoLoud.instance.init();
       _slideSource = await SoLoud.instance.loadAsset('assets/sounds/piece_slide.mp3');
       _captureSource = await SoLoud.instance.loadAsset('assets/sounds/piece_captured.mp3');
-      _tapSource = await SoLoud.instance.loadAsset('assets/sounds/tap.mp3');   // <-- ADD
+      _tapSource = await SoLoud.instance.loadAsset('assets/sounds/tap.mp3');
+      _winSource = await SoLoud.instance.loadAsset('assets/sounds/win.mp3');
+      _loseSource = await SoLoud.instance.loadAsset('assets/sounds/lose.wav');
       _initialized = true;
       debugPrint('SoundManager: initialized');
     } catch (e) {
@@ -43,12 +47,30 @@ class SoundManager {
     }
   }
 
-  void playTap() {   // <-- ADD THIS METHOD
+  void playTap() {
     if (!_initialized || _tapSource == null) return;
     try {
       SoLoud.instance.play(_tapSource!);
     } catch (e) {
       debugPrint('SoundManager: playTap failed — $e');
+    }
+  }
+
+  void playWin() {
+    if (!_initialized || _winSource == null) return;
+    try {
+      SoLoud.instance.play(_winSource!);
+    } catch (e) {
+      debugPrint('SoundManager: playWin failed — $e');
+    }
+  }
+
+  void playLose() {
+    if (!_initialized || _loseSource == null) return;
+    try {
+      SoLoud.instance.play(_loseSource!);
+    } catch (e) {
+      debugPrint('SoundManager: playLose failed — $e');
     }
   }
 
@@ -58,6 +80,8 @@ class SoundManager {
     _initialized = false;
     _slideSource = null;
     _captureSource = null;
-    _tapSource = null;   // <-- ADD
+    _tapSource = null;
+    _winSource = null;
+    _loseSource = null;
   }
 }
