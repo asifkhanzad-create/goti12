@@ -3,6 +3,7 @@ import 'app_colors.dart';
 import 'animated_press_button.dart';
 import 'board_preview.dart';
 import 'difficulty_select_screen.dart';
+import 'game_board_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -51,10 +52,17 @@ class HomeScreen extends StatelessWidget {
                         },
                       ),
                       const SizedBox(height: 14),
-                      GlassButton(
+                      AnimatedPressButton(
                         label: 'Local 2 player',
+                        gradient: AppColors.aiGradient,
+                        textColor: AppColors.aiDeep,
+                        glowColor: AppColors.aiStart,
                         onTap: () {
-                          // TODO: navigate to game screen (local mode)
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const GameBoardScreen.local(),
+                            ),
+                          );
                         },
                       ),
                       const SizedBox(height: 14),

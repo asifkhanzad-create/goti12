@@ -1,3 +1,4 @@
+import 'dart:isolate';
 import 'dart:math' as math;
 import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
@@ -14,9 +15,17 @@ import 'ai_engine.dart';
 /// pieces), so it's easy to actually watch and verify what happened, even
 /// when the AI resolves a whole chain in one decision.
 class GameBoardScreen extends StatefulWidget {
-  const GameBoardScreen({super.key, required this.difficulty});
+  /// Play vs AI — [difficulty] drives search strength.
+  const GameBoardScreen({super.key, required Difficulty this.difficulty})
+      : isLocal = false;
 
-  final Difficulty difficulty;
+  /// Hot-seat local: both teal and amber are human-controlled.
+  const GameBoardScreen.local({super.key})
+      : difficulty = null,
+        isLocal = true;
+
+  final Difficulty? difficulty;
+  final bool isLocal;
 
   @override
   State<GameBoardScreen> createState() => _GameBoardScreenState();
@@ -24,7 +33,7 @@ class GameBoardScreen extends StatefulWidget {
 
 class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderStateMixin {
   late GameState _state;
-  late AiEngine _aiEngine;
+  AiEngine? _aiEngine;
   int? _selectedIndex;
   // when a capture chain is in progress, only continuing jumps are allowed
   // — no plain moves and no manual stop mid-chain.
@@ -49,11 +58,24 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
   /// Ensures win/lose FX only fire once per finished game.
   bool _endFxPlayed = false;
 
+  /// Prevents overlapping AI think/animate cycles.
+  bool _aiBusy = false;
+
+  /// Bumped on play-again / dispose so late isolate results are ignored.
+  int _aiGeneration = 0;
+
+  /// Minimum pause before the AI's piece starts moving (human pacing).
+  /// Search runs in parallel on a background isolate so this is not
+  /// "delay then think" — total wait is roughly max(delay, thinkTime).
+  static const _aiMinDelay = Duration(milliseconds: 650);
+
   @override
   void initState() {
     super.initState();
     _state = GameState.initial(firstTurn: Owner.player);
-    _aiEngine = AiEngine(widget.difficulty);
+    if (!widget.isLocal) {
+      _aiEngine = AiEngine(widget.difficulty!);
+    }
     _hopController = AnimationController(vsync: this, duration: _unitHopDuration);
     _confettiController = ConfettiController(duration: const Duration(seconds: 3));
     _shakeController = AnimationController(
@@ -65,6 +87,7 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
 
   @override
   void dispose() {
+    _aiGeneration++;
     _hopController.dispose();
     _confettiController.dispose();
     _shakeController.dispose();
@@ -73,7 +96,8 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
 
   void _onPointTap(int index) {
     if (_state.phase != GamePhase.playing) return;
-    if (_state.turn != Owner.player) return;
+    // Vs AI: only the human (teal) may tap. Local: both sides are human.
+    if (!widget.isLocal && _state.turn != Owner.player) return;
     if (_hopController.isAnimating) return; // no input mid-slide
 
     if (_chainInProgress) {
@@ -88,7 +112,8 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
     }
 
     final owner = _state.ownerAt(index);
-    if (owner == Owner.player) {
+    // Select only the side whose turn it is (teal or amber).
+    if (owner == _state.turn) {
       setState(() => _selectedIndex = _selectedIndex == index ? null : index);
       return;
     }
@@ -156,22 +181,66 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
     _maybeTriggerAi();
   }
 
-  // Kicks off the AI's move (if it's genuinely its turn) after a short delay
-  // so it doesn't feel instant/robotic. The AI's chosen Move already carries
-  // its full hop-by-hop breakdown (see GameState.captureChainsFrom), so a
-  // multi-capture chain plays out one visible hop at a time, same as the
-  // player's — nothing about how it's applied is different or hidden.
+  // Kicks off the AI's move (if it's genuinely its turn). Search runs on a
+  // background isolate so Hard/Master never freeze the UI. A short minimum
+  // delay keeps the reply from feeling instant; think time overlaps that delay.
+  // The chosen Move already carries its full hop-by-hop breakdown so multi-
+  // capture chains animate one hop at a time, same as the player.
   void _maybeTriggerAi() {
+    if (widget.isLocal) return;
+    if (_aiBusy) return;
     if (_state.phase != GamePhase.playing || _state.turn != Owner.ai) return;
-    Future.delayed(const Duration(milliseconds: 650), () async {
-      if (!mounted) return;
+    _aiBusy = true;
+    final gen = _aiGeneration;
+    _runAiTurn(gen);
+  }
+
+  Future<void> _runAiTurn(int gen) async {
+    try {
+      if (!mounted || gen != _aiGeneration) return;
       if (_state.phase != GamePhase.playing || _state.turn != Owner.ai) return;
-      final move = _aiEngine.chooseMove(_state);
-      if (move == null) return;
+
+      final request = AiChooseRequest(
+        difficultyIndex: widget.difficulty!.index,
+        snapshot: AiBoardSnapshot.fromState(_state),
+      );
+
+      // Think off the UI thread while we also wait for the pacing delay.
+      final results = await Future.wait<Object?>([
+        Isolate.run(() => aiChooseMoveIsolate(request.toJson())),
+        Future<void>.delayed(_aiMinDelay),
+      ]);
+
+      if (!mounted || gen != _aiGeneration) return;
+      if (_state.phase != GamePhase.playing || _state.turn != Owner.ai) return;
+
+      final raw = results[0];
+      if (raw == null) return;
+      final move = AiMovePayload.fromJson(
+        Map<String, Object?>.from(raw as Map),
+      ).toMove();
+
       await _animateAndApply(move);
-      if (!mounted) return;
-      _maybeTriggerAi(); // safety net, shouldn't normally re-fire
-    });
+    } catch (_) {
+      // Isolate failed (rare) — fall back to sync search so the game continues.
+      if (!mounted || gen != _aiGeneration) return;
+      if (_state.phase == GamePhase.playing && _state.turn == Owner.ai) {
+        final move = _aiEngine?.chooseMove(_state);
+        if (move != null) {
+          await _animateAndApply(move);
+        }
+      }
+    } finally {
+      if (gen == _aiGeneration) {
+        _aiBusy = false;
+        if (mounted &&
+            _state.phase == GamePhase.playing &&
+            _state.turn == Owner.ai) {
+          // Safety net if turn is still AI (should be rare).
+          _maybeTriggerAi();
+        }
+      }
+    }
   }
 
   /// Plays every hop of [move] in sequence, then ends the turn. Uses the
@@ -206,7 +275,12 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
         setState(() {});
       case GamePhase.aiWon:
         _endFxPlayed = true;
-        _shakeController.forward(from: 0);
+        if (widget.isLocal) {
+          // Local: amber win is still a win for someone — celebrate, no "you lost".
+          _confettiController.play();
+        } else {
+          _shakeController.forward(from: 0);
+        }
         setState(() {});
       case GamePhase.playing:
         break;
@@ -263,16 +337,20 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
   bool get _isEndgame =>
       _state.phase == GamePhase.playerWon || _state.phase == GamePhase.aiWon;
 
-  /// Fresh game on the same difficulty — stays on this screen.
+  /// Fresh game — same mode (local or same AI difficulty). Stays on this screen.
   void _playAgain() {
     _hopController.stop();
     _hopController.reset();
     _confettiController.stop(clearAllParticles: true);
     _shakeController.stop();
     _shakeController.reset();
+    _aiGeneration++; // invalidate any in-flight isolate result
     setState(() {
       _state = GameState.initial(firstTurn: Owner.player);
-      _aiEngine = AiEngine(widget.difficulty);
+      if (!widget.isLocal) {
+        _aiEngine = AiEngine(widget.difficulty!);
+      }
+      _aiBusy = false;
       _selectedIndex = null;
       _chainInProgress = false;
       _animFrom = null;
@@ -284,14 +362,15 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
     _maybeTriggerAi();
   }
 
-  /// Back to difficulty select (under this route on the nav stack).
-  void _changeDifficulty() {
+  /// Vs AI: back to difficulty select. Local: back to home.
+  void _popToPrevious() {
     Navigator.of(context).pop();
   }
 
   @override
   Widget build(BuildContext context) {
-    final lost = _state.phase == GamePhase.aiWon;
+    // Dim + shake only when the human loses to AI (not in local 2P).
+    final lost = !widget.isLocal && _state.phase == GamePhase.aiWon;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -317,7 +396,7 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
               children: [
                 const SizedBox(height: 8),
                 // Banner stays above the lose dim so "YOU LOST" stays readable.
-                _StatusBanner(state: _state),
+                _StatusBanner(state: _state, isLocal: widget.isLocal),
                 Expanded(
                   child: Column(
                     children: [
@@ -437,11 +516,13 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
                               ),
                               const SizedBox(height: 12),
                               AnimatedPressButton(
-                                label: 'Change difficulty',
+                                label: widget.isLocal
+                                    ? 'Back to menu'
+                                    : 'Change difficulty',
                                 gradient: AppColors.aiGradient,
                                 textColor: AppColors.aiDeep,
                                 glowColor: AppColors.aiStart,
-                                onTap: _changeDifficulty,
+                                onTap: _popToPrevious,
                               ),
                             ],
                           ),
@@ -495,9 +576,10 @@ Offset boardPointCenter(BoardPoint point, double size) {
 }
 
 class _StatusBanner extends StatefulWidget {
-  const _StatusBanner({required this.state});
+  const _StatusBanner({required this.state, required this.isLocal});
 
   final GameState state;
+  final bool isLocal;
 
   @override
   State<_StatusBanner> createState() => _StatusBannerState();
@@ -587,16 +669,20 @@ class _StatusBannerState extends State<_StatusBanner>
 
     switch (widget.state.phase) {
       case GamePhase.playerWon:
-        label = 'YOU WIN';
+        label = widget.isLocal ? 'PLAYER 1 WINS' : 'YOU WIN';
         color = AppColors.playerStart;
         break;
       case GamePhase.aiWon:
-        label = 'YOU LOST';
+        label = widget.isLocal ? 'PLAYER 2 WINS' : 'YOU LOST';
         color = AppColors.aiStart;
         break;
       case GamePhase.playing:
         final isPlayer = widget.state.turn == Owner.player;
-        label = isPlayer ? 'YOUR TURN' : "AI IS THINKING…";
+        if (widget.isLocal) {
+          label = isPlayer ? "PLAYER 1'S TURN" : "PLAYER 2'S TURN";
+        } else {
+          label = isPlayer ? 'YOUR TURN' : 'AI IS THINKING…';
+        }
         color = isPlayer ? AppColors.playerStart : AppColors.aiStart;
         break;
     }
