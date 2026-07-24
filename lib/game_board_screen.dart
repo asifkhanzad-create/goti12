@@ -431,59 +431,65 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
                                     child: LayoutBuilder(
                                       builder: (context, constraints) {
                                         final boardSize = constraints.maxWidth;
-                                        return AnimatedBuilder(
-                                          animation: _hopController,
-                                          builder: (context, _) {
-                                            final t = _hopController.value;
-                                            return Stack(
-                                              clipBehavior: Clip.none,
-                                              children: [
-                                                CustomPaint(
-                                                  size: Size(
-                                                    boardSize,
-                                                    boardSize,
-                                                  ),
-                                                  painter: _BoardLinesPainter(),
+                                        return Stack(
+                                          clipBehavior: Clip.none,
+                                          children: [
+                                            RepaintBoundary(
+                                              child: CustomPaint(
+                                                size: Size(
+                                                  boardSize,
+                                                  boardSize,
                                                 ),
-                                                for (final p
-                                                    in BoardGraph.points)
-                                                  _PositionedPoint(
-                                                    point: p,
-                                                    size: boardSize,
-                                                    owner: p.index == _animFrom
-                                                        ? null
-                                                        : _state.ownerAt(
-                                                            p.index,
-                                                          ),
-                                                    isSelected: _selectedIndex ==
-                                                        p.index,
-                                                    fadeProgress:
-                                                        _animCaptured.contains(
-                                                          p.index,
-                                                        )
-                                                            ? t
-                                                            : 0.0,
-                                                    onTap: () =>
-                                                        _onPointTap(p.index),
-                                                  ),
-                                                if (_animFrom != null &&
-                                                    _animOwner != null)
-                                                  _SlidingPiece(
-                                                    from: BoardPoint(
-                                                      _animFrom! % 5,
-                                                      _animFrom! ~/ 5,
-                                                    ),
-                                                    to: BoardPoint(
-                                                      _animTo! % 5,
-                                                      _animTo! ~/ 5,
-                                                    ),
-                                                    boardSize: boardSize,
-                                                    owner: _animOwner!,
-                                                    progress: t,
-                                                  ),
-                                              ],
-                                            );
-                                          },
+                                                painter: _BoardLinesPainter(),
+                                              ),
+                                            ),
+                                            // Static points — only rebuilds on actual state / selection changes
+                                            for (final p in BoardGraph.points)
+                                              _PositionedPoint(
+                                                key: ValueKey(p.index),
+                                                point: p,
+                                                size: boardSize,
+                                                owner: (p.index == _animFrom || _animCaptured.contains(p.index))
+                                                    ? null
+                                                    : _state.ownerAt(p.index),
+                                                isSelected: _selectedIndex == p.index,
+                                                fadeProgress: 0.0,
+                                                onTap: () => _onPointTap(p.index),
+                                              ),
+                                            // Isolated animation layer — updates on hopController frame ticks
+                                            AnimatedBuilder(
+                                              animation: _hopController,
+                                              builder: (context, _) {
+                                                final t = _hopController.value;
+                                                return Stack(
+                                                  clipBehavior: Clip.none,
+                                                  children: [
+                                                    for (final capIdx in _animCaptured)
+                                                      _CapturedFadeOverlay(
+                                                        point: BoardGraph.points[capIdx],
+                                                        size: boardSize,
+                                                        owner: _state.ownerAt(capIdx),
+                                                        progress: t,
+                                                      ),
+                                                    if (_animFrom != null && _animOwner != null)
+                                                      _SlidingPiece(
+                                                        from: BoardPoint(
+                                                          _animFrom! % 5,
+                                                          _animFrom! ~/ 5,
+                                                        ),
+                                                        to: BoardPoint(
+                                                          _animTo! % 5,
+                                                          _animTo! ~/ 5,
+                                                        ),
+                                                        boardSize: boardSize,
+                                                        owner: _animOwner!,
+                                                        progress: t,
+                                                      ),
+                                                  ],
+                                                );
+                                              },
+                                            ),
+                                          ],
                                         );
                                       },
                                     ),
@@ -613,15 +619,13 @@ class _StatusBannerState extends State<_StatusBanner>
       vsync: this,
       duration: const Duration(milliseconds: 550),
     );
-    // Scale-only entrance (no opacity fade) so text stays visible even if
-    // the controller fails to start.
     _scale = Tween<double>(begin: 0.65, end: 1.0).animate(
       CurvedAnimation(parent: _entranceController, curve: Curves.elasticOut),
     );
     _pulseController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    );
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
     _pulse = Tween<double>(begin: 1.0, end: 1.06).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
@@ -643,10 +647,7 @@ class _StatusBannerState extends State<_StatusBanner>
     if (isEnd && !wasEnd) {
       _startEndgameAnim();
     } else if (!isEnd && wasEnd) {
-      _entranceController.stop();
-      _entranceController.reset();
-      _pulseController.stop();
-      _pulseController.reset();
+      _pulseController.repeat(reverse: true);
     }
     _lastPhase = phase;
   }
@@ -693,17 +694,23 @@ class _StatusBannerState extends State<_StatusBanner>
     }
 
     if (!_isEndgame) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: color,
-            fontSize: 13,
-            letterSpacing: 1.5,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+      return AnimatedBuilder(
+        animation: _pulseController,
+        builder: (context, child) {
+          final alpha = 0.82 + (_pulseController.value * 0.18);
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: color.withValues(alpha: alpha),
+                fontSize: 13,
+                letterSpacing: 1.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          );
+        },
       );
     }
 
@@ -733,6 +740,7 @@ class _StatusBannerState extends State<_StatusBanner>
 
 class _PositionedPoint extends StatelessWidget {
   const _PositionedPoint({
+    super.key,
     required this.point,
     required this.size,
     required this.owner,
@@ -762,13 +770,43 @@ class _PositionedPoint extends StatelessWidget {
         onTap: onTap,
         child: owner == null
             ? const SizedBox.shrink()
-            : Opacity(
-                opacity: 1.0 - fadeProgress,
-                child: Transform.scale(
-                  scale: 1.0 - (fadeProgress * 0.4),
-                  child: _Piece(owner: owner!, isSelected: isSelected),
-                ),
-              ),
+            : _Piece(owner: owner!, isSelected: isSelected),
+      ),
+    );
+  }
+}
+
+class _CapturedFadeOverlay extends StatelessWidget {
+  const _CapturedFadeOverlay({
+    required this.point,
+    required this.size,
+    required this.owner,
+    required this.progress,
+  });
+
+  final BoardPoint point;
+  final double size;
+  final Owner? owner;
+  final double progress;
+
+  @override
+  Widget build(BuildContext context) {
+    if (owner == null) return const SizedBox.shrink();
+    const hitSize = 44.0;
+    final c = boardPointCenter(point, size);
+    return Positioned(
+      left: c.dx - hitSize / 2,
+      top: c.dy - hitSize / 2,
+      width: hitSize,
+      height: hitSize,
+      child: IgnorePointer(
+        child: Opacity(
+          opacity: (1.0 - progress).clamp(0.0, 1.0),
+          child: Transform.scale(
+            scale: 1.0 - (progress * 0.4),
+            child: _Piece(owner: owner!, isSelected: false),
+          ),
+        ),
       ),
     );
   }
@@ -810,15 +848,51 @@ class _SlidingPiece extends StatelessWidget {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: baseColor,
-            boxShadow: [
-              BoxShadow(color: baseColor.withValues(alpha: 0.5), blurRadius: 14, spreadRadius: 2),
-            ],
+            boxShadow: owner == Owner.player
+                ? const [_playerSlidingShadow]
+                : const [_aiSlidingShadow],
           ),
         ),
       ),
     );
   }
 }
+
+const _playerSlidingShadow = BoxShadow(
+  color: Color(0x8014B8A6), // AppColors.playerStart with 0.5 alpha
+  blurRadius: 14,
+  spreadRadius: 2,
+);
+
+const _aiSlidingShadow = BoxShadow(
+  color: Color(0x80F59E0B), // AppColors.aiStart with 0.5 alpha
+  blurRadius: 14,
+  spreadRadius: 2,
+);
+
+const _playerPieceDecoration = BoxDecoration(
+  shape: BoxShape.circle,
+  color: AppColors.playerStart,
+  boxShadow: [
+    BoxShadow(
+      color: Color(0x5914B8A6), // AppColors.playerStart with 0.35 alpha
+      blurRadius: 10,
+      spreadRadius: 1,
+    ),
+  ],
+);
+
+const _aiPieceDecoration = BoxDecoration(
+  shape: BoxShape.circle,
+  color: AppColors.aiStart,
+  boxShadow: [
+    BoxShadow(
+      color: Color(0x59F59E0B), // AppColors.aiStart with 0.35 alpha
+      blurRadius: 10,
+      spreadRadius: 1,
+    ),
+  ],
+);
 
 class _Piece extends StatefulWidget {
   const _Piece({required this.owner, required this.isSelected});
@@ -864,23 +938,20 @@ class _PieceState extends State<_Piece> with SingleTickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    final baseColor = widget.owner == Owner.player ? AppColors.playerStart : AppColors.aiStart;
-
     if (!widget.isSelected) {
+      final decor = widget.owner == Owner.player
+          ? _playerPieceDecoration
+          : _aiPieceDecoration;
       return Center(
         child: Container(
           width: 18,
           height: 18,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: baseColor,
-            boxShadow: [
-              BoxShadow(color: baseColor.withValues(alpha: 0.35), blurRadius: 10, spreadRadius: 1),
-            ],
-          ),
+          decoration: decor,
         ),
       );
     }
+
+    final baseColor = widget.owner == Owner.player ? AppColors.playerStart : AppColors.aiStart;
 
     return AnimatedBuilder(
       animation: _pulseController,
