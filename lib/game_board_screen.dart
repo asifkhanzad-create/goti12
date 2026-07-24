@@ -7,7 +7,7 @@ import 'app_colors.dart';
 import 'board_point.dart';
 import 'game_state.dart';
 import 'ai_engine.dart';
-
+import 'sound_manager.dart';
 /// The real, interactive 12 Goti board, driven by [GameState].
 ///
 /// Every move — player or AI, plain or multi-hop capture chain — plays out
@@ -44,7 +44,7 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
   late final AnimationController _shakeController;
   /// Duration for one orthogonal grid step (distance 1.0). Longer hops
   /// scale from this with a mild distance factor (see [_hopDurationFor]).
-  static const _unitHopDuration = Duration(milliseconds: 250);
+  static const _unitHopDuration = Duration(milliseconds: 260);
   static const _aiChainGap = Duration(milliseconds: 200); // beat between chained AI kills
 
   // Mid-hop animation state: the piece currently sliding, and any pieces
@@ -140,6 +140,7 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
       _chainInProgress = false;
     });
     await _animateHop(from, MoveStep(to: to), _hopDurationFor(from, to));
+    SoundManager.instance.playSlide();
     setState(() => _state.endTurn());
     _maybePlayEndgameFx();
     _maybeTriggerAi();
@@ -252,6 +253,7 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
     for (var i = 0; i < steps.length; i++) {
       final hopDuration = _hopDurationFor(current, steps[i].to);
       await _animateHop(current, steps[i], hopDuration);
+      if (steps[i].captured.isEmpty) SoundManager.instance.playSlide();
       if (_state.phase != GamePhase.playing) {
         _maybePlayEndgameFx();
         return;
@@ -298,6 +300,7 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
       _animCaptured = step.captured;
     });
     await _hopController.forward(from: 0);
+    if (step.captured.isNotEmpty) SoundManager.instance.playCapture();
     setState(() {
       _state.applyStep(from, step);
       _animFrom = null;

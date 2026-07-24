@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'home_screen.dart';
+import 'sound_manager.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  await SoundManager.instance.init();
   runApp(const Goti12App());
 }
 
@@ -30,9 +32,6 @@ class _Goti12AppState extends State<Goti12App> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Some devices quietly bring back the status/nav bars on resume
-    // (returning from background, screen unlock, etc). Reapply immersive
-    // mode every time the app becomes active again.
     if (state == AppLifecycleState.resumed) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     }
