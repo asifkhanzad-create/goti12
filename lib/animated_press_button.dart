@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'app_colors.dart';
+import 'sound_manager.dart';   // <-- ADD THIS
 
 /// A button that visibly "presses" inward when tapped — scales down slightly,
 /// softens its glow/shadow, and springs back on release.
@@ -38,7 +39,10 @@ class _AnimatedPressButtonState extends State<AnimatedPressButton> {
       onTapDown: (_) => _setPressed(true),
       onTapUp: (_) => _setPressed(false),
       onTapCancel: () => _setPressed(false),
-      onTap: widget.onTap,
+            onTap: () {
+        SoundManager.instance.playTap();
+        widget.onTap();
+      },
       child: AnimatedScale(
         scale: _pressed ? 0.96 : 1.0,
         duration: const Duration(milliseconds: 100),
@@ -113,7 +117,10 @@ class _GlassButtonState extends State<GlassButton> {
       onTapDown: (_) => _setPressed(true),
       onTapUp: (_) => _setPressed(false),
       onTapCancel: () => _setPressed(false),
-      onTap: widget.onTap,
+            onTap: () {
+        SoundManager.instance.playTap();
+        widget.onTap();
+      },
       child: AnimatedScale(
         scale: _pressed ? 0.97 : 1.0,
         duration: const Duration(milliseconds: 100),

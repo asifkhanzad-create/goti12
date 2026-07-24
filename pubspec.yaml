@@ -26,3 +26,4 @@ flutter:
   assets:
     - assets/sounds/piece_slide.mp3
     - assets/sounds/piece_captured.mp3 # FIXED: Added the missing 'd' to match your Dart code
+    - assets/sounds/tap.mp3
