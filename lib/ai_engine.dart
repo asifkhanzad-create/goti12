@@ -196,7 +196,7 @@ class AiEngine {
       case Difficulty.easy:
         return 0.35;
       case Difficulty.medium:
-        return 0.12;
+        return 0.20; // 20% easier (higher mistake chance from 0.12 to 0.144)
       case Difficulty.hard:
         return 0.0;
       case Difficulty.master:
