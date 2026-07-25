@@ -4,6 +4,8 @@ import 'animated_press_button.dart';
 import 'board_preview.dart';
 import 'difficulty_select_screen.dart';
 import 'game_board_screen.dart';
+import 'settings_screen.dart';
+import 'how_to_play_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -69,21 +71,33 @@ class HomeScreen extends StatelessWidget {
                       Row(
                         children: [
                           Expanded(
-                            child: GlassButton(
+                            child: AnimatedPressButton(
                               label: 'Settings',
-                              fontSize: 13,
+                              gradient: AppColors.playerGradient,
+                              textColor: AppColors.playerDeep,
+                              glowColor: AppColors.playerStart,
                               onTap: () {
-                                // TODO: navigate to settings
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => const SettingsScreen(),
+                                  ),
+                                );
                               },
                             ),
                           ),
                           const SizedBox(width: 14),
                           Expanded(
-                            child: GlassButton(
+                            child: AnimatedPressButton(
                               label: 'How to play',
-                              fontSize: 13,
+                              gradient: AppColors.aiGradient,
+                              textColor: AppColors.aiDeep,
+                              glowColor: AppColors.aiStart,
                               onTap: () {
-                                // TODO: navigate to rules screen
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => const HowToPlayScreen(),
+                                  ),
+                                );
                               },
                             ),
                           ),

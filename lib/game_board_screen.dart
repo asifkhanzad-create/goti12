@@ -114,6 +114,7 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
     final owner = _state.ownerAt(index);
     // Select only the side whose turn it is (teal or amber).
     if (owner == _state.turn) {
+      SoundManager.instance.playTap();
       setState(() => _selectedIndex = _selectedIndex == index ? null : index);
       return;
     }

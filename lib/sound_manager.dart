@@ -1,5 +1,6 @@
 // lib/sound_manager.dart
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_soloud/flutter_soloud.dart';
 
 class SoundManager {
@@ -12,6 +13,9 @@ class SoundManager {
   AudioSource? _winSource;
   AudioSource? _loseSource;
   bool _initialized = false;
+
+  bool soundEnabled = true;
+  bool hapticsEnabled = true;
 
   Future<void> init() async {
     if (_initialized) return;
@@ -30,7 +34,7 @@ class SoundManager {
   }
 
   void playSlide() {
-    if (!_initialized || _slideSource == null) return;
+    if (!soundEnabled || !_initialized || _slideSource == null) return;
     try {
       SoLoud.instance.play(_slideSource!);
     } catch (e) {
@@ -39,7 +43,14 @@ class SoundManager {
   }
 
   void playCapture() {
-    if (!_initialized || _captureSource == null) return;
+    if (hapticsEnabled) {
+      HapticFeedback.heavyImpact();
+      HapticFeedback.vibrate();
+      Future.delayed(const Duration(milliseconds: 50), () {
+        HapticFeedback.vibrate();
+      });
+    }
+    if (!soundEnabled || !_initialized || _captureSource == null) return;
     try {
       SoLoud.instance.play(_captureSource!);
     } catch (e) {
@@ -48,7 +59,11 @@ class SoundManager {
   }
 
   void playTap() {
-    if (!_initialized || _tapSource == null) return;
+    if (hapticsEnabled) {
+      HapticFeedback.selectionClick();
+      HapticFeedback.vibrate();
+    }
+    if (!soundEnabled || !_initialized || _tapSource == null) return;
     try {
       SoLoud.instance.play(_tapSource!);
     } catch (e) {
@@ -57,7 +72,10 @@ class SoundManager {
   }
 
   void playWin() {
-    if (!_initialized || _winSource == null) return;
+    if (hapticsEnabled) {
+      HapticFeedback.vibrate();
+    }
+    if (!soundEnabled || !_initialized || _winSource == null) return;
     try {
       SoLoud.instance.play(_winSource!);
     } catch (e) {
@@ -66,7 +84,10 @@ class SoundManager {
   }
 
   void playLose() {
-    if (!_initialized || _loseSource == null) return;
+    if (hapticsEnabled) {
+      HapticFeedback.vibrate();
+    }
+    if (!soundEnabled || !_initialized || _loseSource == null) return;
     try {
       SoLoud.instance.play(_loseSource!);
     } catch (e) {
