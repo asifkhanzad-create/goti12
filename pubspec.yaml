@@ -24,7 +24,7 @@ flutter:
 
   # FIXED: Moved from dependencies down to the root flutter block with exact spacing
   assets:
-    - assets/sounds/piece_slide.mp3
+    - assets/sounds/piece_slide.wav
     - assets/sounds/piece_captured.mp3 # FIXED: Added the missing 'd' to match your Dart code
     - assets/sounds/tap.mp3
     - assets/sounds/win.mp3 

@@ -21,7 +21,7 @@ class SoundManager {
     try {
       await SoLoud.instance.init();
       _slideSource = await SoLoud.instance.loadAsset(
-        'assets/sounds/piece_slide.mp3',
+        'assets/sounds/piece_slide.wav',
       );
       _captureSource = await SoLoud.instance.loadAsset(
         'assets/sounds/piece_captured.mp3',
