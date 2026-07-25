@@ -1,4 +1,3 @@
-// lib/sound_manager.dart
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_soloud/flutter_soloud.dart';
@@ -21,15 +20,19 @@ class SoundManager {
     if (_initialized) return;
     try {
       await SoLoud.instance.init();
-      _slideSource = await SoLoud.instance.loadAsset('assets/sounds/piece_slide.mp3');
-      _captureSource = await SoLoud.instance.loadAsset('assets/sounds/piece_captured.mp3');
+      _slideSource = await SoLoud.instance.loadAsset(
+        'assets/sounds/piece_slide.mp3',
+      );
+      _captureSource = await SoLoud.instance.loadAsset(
+        'assets/sounds/piece_captured.mp3',
+      );
       _tapSource = await SoLoud.instance.loadAsset('assets/sounds/tap.mp3');
       _winSource = await SoLoud.instance.loadAsset('assets/sounds/win.mp3');
       _loseSource = await SoLoud.instance.loadAsset('assets/sounds/lose.wav');
       _initialized = true;
       debugPrint('SoundManager: initialized');
     } catch (e) {
-      debugPrint('SoundManager: init failed — $e');
+      debugPrint('SoundManager: init failed â€” $e');
     }
   }
 
