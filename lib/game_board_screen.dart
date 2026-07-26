@@ -62,6 +62,9 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
   /// Ensures win/lose FX only fire once per finished game.
   bool _endFxPlayed = false;
 
+  /// Shows the pause overlay (Resume / Quit) instead of exiting the game.
+  bool _paused = false;
+
   /// Prevents overlapping AI think/animate cycles.
   bool _aiBusy = false;
 
@@ -376,17 +379,42 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
     Navigator.of(context).pop();
   }
 
+  /// Back arrow / system back now pauses instead of exiting.
+  void _openPauseMenu() {
+    if (_isEndgame) return; // no pause menu once the game is already over
+    setState(() => _paused = true);
+  }
+
+  void _resume() {
+    setState(() => _paused = false);
+  }
+
+  void _quitGame() {
+    setState(() => _paused = false);
+    _popToPrevious();
+  }
+
   @override
   Widget build(BuildContext context) {
     // Dim + shake only when the human loses to AI (not in local 2P).
     final lost = !widget.isLocal && _state.phase == GamePhase.aiWon;
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (didPop) return;
+        _openPauseMenu();
+      },
+      child: Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
         iconTheme: const IconThemeData(color: AppColors.textPrimary),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: _openPauseMenu,
+        ),
         title: const Text(
           'PLAY',
           style: TextStyle(
@@ -572,7 +600,55 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
               ),
             ),
           ),
+
+          // Pause overlay — blocks the board underneath and offers
+          // Resume / Quit, same button theme as the endgame actions.
+          if (_paused)
+            Positioned.fill(
+              child: Container(
+                color: AppColors.background.withValues(alpha: 0.88),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'PAUSED',
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 3,
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                      SizedBox(
+                        width: 220,
+                        child: AnimatedPressButton(
+                          label: 'Resume',
+                          gradient: AppColors.playerGradient,
+                          textColor: AppColors.playerDeep,
+                          glowColor: AppColors.playerStart,
+                          onTap: _resume,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: 220,
+                        child: AnimatedPressButton(
+                          label: 'Quit game',
+                          gradient: AppColors.aiGradient,
+                          textColor: AppColors.aiDeep,
+                          glowColor: AppColors.aiStart,
+                          onTap: _quitGame,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ],
+      ),
       ),
     );
   }
