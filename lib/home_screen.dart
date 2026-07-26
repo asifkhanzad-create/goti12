@@ -3,7 +3,7 @@ import 'app_colors.dart';
 import 'animated_press_button.dart';
 import 'board_preview.dart';
 import 'difficulty_select_screen.dart';
-import 'game_board_screen.dart';
+import 'orb_duel_screen.dart';
 import 'settings_screen.dart';
 import 'how_to_play_screen.dart';
 
@@ -62,7 +62,7 @@ class HomeScreen extends StatelessWidget {
                         onTap: () {
                           Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (_) => const GameBoardScreen.local(),
+                              builder: (_) => const OrbDuelScreen(),
                             ),
                           );
                         },

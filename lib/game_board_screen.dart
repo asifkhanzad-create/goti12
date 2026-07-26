@@ -16,16 +16,20 @@ import 'sound_manager.dart';
 /// when the AI resolves a whole chain in one decision.
 class GameBoardScreen extends StatefulWidget {
   /// Play vs AI — [difficulty] drives search strength.
-  const GameBoardScreen({super.key, required Difficulty this.difficulty})
-      : isLocal = false;
+  const GameBoardScreen({
+    super.key,
+    required Difficulty this.difficulty,
+    this.firstTurn = Owner.player,
+  }) : isLocal = false;
 
   /// Hot-seat local: both teal and amber are human-controlled.
-  const GameBoardScreen.local({super.key})
+  const GameBoardScreen.local({super.key, this.firstTurn = Owner.player})
       : difficulty = null,
         isLocal = true;
 
   final Difficulty? difficulty;
   final bool isLocal;
+  final Owner firstTurn;
 
   @override
   State<GameBoardScreen> createState() => _GameBoardScreenState();
@@ -72,7 +76,7 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
   @override
   void initState() {
     super.initState();
-    _state = GameState.initial(firstTurn: Owner.player);
+    _state = GameState.initial(firstTurn: widget.firstTurn);
     if (!widget.isLocal) {
       _aiEngine = AiEngine(widget.difficulty!);
     }

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'app_colors.dart';
 import 'animated_press_button.dart';
 import 'ai_engine.dart';
-import 'game_board_screen.dart';
+import 'orb_duel_screen.dart';
 
 /// Shown after "Play vs AI" — lets the player pick a difficulty before
 /// starting the game. Reuses the same button widgets/theme as the home
@@ -12,7 +12,7 @@ class DifficultySelectScreen extends StatelessWidget {
 
   void _start(BuildContext context, Difficulty difficulty) {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => GameBoardScreen(difficulty: difficulty)),
+      MaterialPageRoute(builder: (_) => OrbDuelScreen(difficulty: difficulty)),
     );
   }
 
