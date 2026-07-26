@@ -44,7 +44,7 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
   late final AnimationController _shakeController;
   /// Duration for one orthogonal grid step (distance 1.0). Longer hops
   /// scale from this with a mild distance factor (see [_hopDurationFor]).
-  static const _unitHopDuration = Duration(milliseconds: 260);
+  static const _unitHopDuration = Duration(milliseconds: 350);
   static const _aiChainGap = Duration(milliseconds: 200); // beat between chained AI kills
 
   // Mid-hop animation state: the piece currently sliding, and any pieces
@@ -141,7 +141,6 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
       _chainInProgress = false;
     });
     await _animateHop(from, MoveStep(to: to), _hopDurationFor(from, to));
-    SoundManager.instance.playSlide();
     setState(() => _state.endTurn());
     _maybePlayEndgameFx();
     _maybeTriggerAi();
@@ -254,7 +253,6 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
     for (var i = 0; i < steps.length; i++) {
       final hopDuration = _hopDurationFor(current, steps[i].to);
       await _animateHop(current, steps[i], hopDuration);
-      if (steps[i].captured.isEmpty) SoundManager.instance.playSlide();
       if (_state.phase != GamePhase.playing) {
         _maybePlayEndgameFx();
         return;
@@ -302,6 +300,7 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
       _animOwner = _state.ownerAt(from);
       _animCaptured = step.captured;
     });
+    if (step.captured.isEmpty) SoundManager.instance.playSlide();
     await _hopController.forward(from: 0);
     if (step.captured.isNotEmpty) SoundManager.instance.playCapture();
     setState(() {
