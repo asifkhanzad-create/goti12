@@ -46,7 +46,7 @@ enum GamePhase { playing, playerWon, aiWon }
 /// win-condition checks. Pure logic — no Flutter/UI here.
 class GameState {
   GameState({required Map<int, Owner?> occupants, required this.turn})
-      : occupants = Map<int, Owner?>.from(occupants);
+    : occupants = Map<int, Owner?>.from(occupants);
 
   final Map<int, Owner?> occupants; // point index -> owner or null
   Owner turn;
@@ -74,19 +74,16 @@ class GameState {
   List<int> plainMovesFrom(int from) {
     final owner = occupants[from];
     if (owner == null) return const [];
-    return BoardGraph.neighborsOf(BoardPoint(from % 5, from ~/ 5))
-        .where((n) => occupants[n] == null)
-        .toList();
+    return BoardGraph.neighborsOf(
+      BoardPoint(from % 5, from ~/ 5),
+    ).where((n) => occupants[n] == null).toList();
   }
 
   /// Single-jump captures available from [from]: an adjacent opponent piece
   /// with an empty landing point directly beyond it, in a straight line
   /// along an existing board connection.
-  List<Move> capturesFrom(int from) => _capturesFromWithBoard(
-        from,
-        occupants[from],
-        occupants,
-      );
+  List<Move> capturesFrom(int from) =>
+      _capturesFromWithBoard(from, occupants[from], occupants);
 
   /// All capture chains starting at [from], fully expanded (each chain step
   /// is optional, so this returns every possible chain length including the
@@ -109,24 +106,32 @@ class GameState {
       }
       tempOccupants[currentFrom] = owner;
 
-      final nextJumps = _capturesFromWithBoard(currentFrom, owner, tempOccupants);
+      final nextJumps = _capturesFromWithBoard(
+        currentFrom,
+        owner,
+        tempOccupants,
+      );
       if (nextJumps.isEmpty && capturedSoFar.isNotEmpty) {
-        results.add(Move(
-          from: originalFrom,
-          to: currentFrom,
-          captured: capturedSoFar,
-          steps: stepsSoFar,
-        ));
+        results.add(
+          Move(
+            from: originalFrom,
+            to: currentFrom,
+            captured: capturedSoFar,
+            steps: stepsSoFar,
+          ),
+        );
         return;
       }
       if (capturedSoFar.isNotEmpty) {
         // chaining is optional — stopping here is also a valid move
-        results.add(Move(
-          from: originalFrom,
-          to: currentFrom,
-          captured: capturedSoFar,
-          steps: stepsSoFar,
-        ));
+        results.add(
+          Move(
+            from: originalFrom,
+            to: currentFrom,
+            captured: capturedSoFar,
+            steps: stepsSoFar,
+          ),
+        );
       }
       for (final jump in nextJumps) {
         explore(
@@ -139,12 +144,18 @@ class GameState {
     }
 
     for (final jump in capturesFrom(from)) {
-      explore(jump.to, jump.captured, [MoveStep(to: jump.to, captured: jump.captured)], from);
+      explore(jump.to, jump.captured, [
+        MoveStep(to: jump.to, captured: jump.captured),
+      ], from);
     }
     return results;
   }
 
-  List<Move> _capturesFromWithBoard(int from, Owner? owner, Map<int, Owner?> board) {
+  List<Move> _capturesFromWithBoard(
+    int from,
+    Owner? owner,
+    Map<int, Owner?> board,
+  ) {
     if (owner == null) return const [];
     final fromPoint = BoardPoint(from % 5, from ~/ 5);
     final moves = <Move>[];
@@ -157,12 +168,16 @@ class GameState {
       final landPoint = BoardPoint(landCol, landRow);
       if (!BoardGraph.areAdjacent(midPoint, landPoint)) continue;
       if (board[landPoint.index] != null) continue;
-      moves.add(Move(
-        from: from,
-        to: landPoint.index,
-        captured: [midIndex],
-        steps: [MoveStep(to: landPoint.index, captured: [midIndex])],
-      ));
+      moves.add(
+        Move(
+          from: from,
+          to: landPoint.index,
+          captured: [midIndex],
+          steps: [
+            MoveStep(to: landPoint.index, captured: [midIndex]),
+          ],
+        ),
+      );
     }
     return moves;
   }
@@ -171,7 +186,13 @@ class GameState {
   /// chain options. Captures are optional, so both lists are valid choices.
   List<Move> legalMovesFrom(int from) {
     final plain = plainMovesFrom(from)
-        .map((to) => Move(from: from, to: to, steps: [MoveStep(to: to)]))
+        .map(
+          (to) => Move(
+            from: from,
+            to: to,
+            steps: [MoveStep(to: to)],
+          ),
+        )
         .toList();
     final captures = captureChainsFrom(from);
     return [...plain, ...captures];
@@ -228,7 +249,9 @@ class GameState {
   }
 
   void _checkWipeout() {
-    final playerPieces = occupants.values.where((o) => o == Owner.player).length;
+    final playerPieces = occupants.values
+        .where((o) => o == Owner.player)
+        .length;
     final aiPieces = occupants.values.where((o) => o == Owner.ai).length;
     if (playerPieces == 0) {
       phase = GamePhase.aiWon;

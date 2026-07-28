@@ -25,7 +25,8 @@ class OrbDuelScreen extends StatefulWidget {
   State<OrbDuelScreen> createState() => _OrbDuelScreenState();
 }
 
-class _OrbDuelScreenState extends State<OrbDuelScreen> with SingleTickerProviderStateMixin {
+class _OrbDuelScreenState extends State<OrbDuelScreen>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Owner _winner;
   bool _revealed = false;
@@ -35,14 +36,15 @@ class _OrbDuelScreenState extends State<OrbDuelScreen> with SingleTickerProvider
   void initState() {
     super.initState();
     _winner = Random().nextBool() ? Owner.player : Owner.ai;
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1600),
-    )..addStatusListener((status) {
-        if (status == AnimationStatus.completed) {
-          setState(() => _revealed = true);
-        }
-      });
+    _controller =
+        AnimationController(
+          vsync: this,
+          duration: const Duration(milliseconds: 1600),
+        )..addStatusListener((status) {
+          if (status == AnimationStatus.completed) {
+            setState(() => _revealed = true);
+          }
+        });
     _controller.forward();
   }
 
@@ -83,7 +85,10 @@ class _OrbDuelScreenState extends State<OrbDuelScreen> with SingleTickerProvider
                 child: AnimatedBuilder(
                   animation: _controller,
                   builder: (context, _) {
-                    return _OrbDuelVisual(progress: _controller.value, winner: _winner);
+                    return _OrbDuelVisual(
+                      progress: _controller.value,
+                      winner: _winner,
+                    );
                   },
                 ),
               ),
@@ -94,7 +99,9 @@ class _OrbDuelScreenState extends State<OrbDuelScreen> with SingleTickerProvider
                   ? Column(
                       children: [
                         Text(
-                          _winner == Owner.player ? 'YOU GO FIRST' : 'AI GOES FIRST',
+                          _winner == Owner.player
+                              ? 'YOU GO FIRST'
+                              : 'AI GOES FIRST',
                           style: TextStyle(
                             color: _winner == Owner.player
                                 ? AppColors.playerStart
@@ -113,8 +120,9 @@ class _OrbDuelScreenState extends State<OrbDuelScreen> with SingleTickerProvider
                           textColor: _winner == Owner.player
                               ? AppColors.playerDeep
                               : AppColors.aiDeep,
-                          glowColor:
-                              _winner == Owner.player ? AppColors.playerStart : AppColors.aiStart,
+                          glowColor: _winner == Owner.player
+                              ? AppColors.playerStart
+                              : AppColors.aiStart,
                           onTap: _continue,
                         ),
                       ],
@@ -171,8 +179,10 @@ class _OrbDuelVisual extends StatelessWidget {
     final playerDx = -spread * (1 - travel);
     final aiDx = spread * (1 - travel);
 
-    final playerScale = 1.0 + charge * 0.15 + (playerIsWinner ? reveal * 0.7 : 0.0);
-    final aiScale = 1.0 + charge * 0.15 + (!playerIsWinner ? reveal * 0.7 : 0.0);
+    final playerScale =
+        1.0 + charge * 0.15 + (playerIsWinner ? reveal * 0.7 : 0.0);
+    final aiScale =
+        1.0 + charge * 0.15 + (!playerIsWinner ? reveal * 0.7 : 0.0);
 
     final playerOpacity = playerIsWinner ? 1.0 : (1.0 - reveal).clamp(0.0, 1.0);
     final aiOpacity = !playerIsWinner ? 1.0 : (1.0 - reveal).clamp(0.0, 1.0);
@@ -222,11 +232,13 @@ class _Orb extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: RadialGradient(
-          colors: [color, color.withValues(alpha: 0.6)],
-        ),
+        gradient: RadialGradient(colors: [color, color.withValues(alpha: 0.6)]),
         boxShadow: [
-          BoxShadow(color: color.withValues(alpha: 0.6), blurRadius: 28, spreadRadius: 4),
+          BoxShadow(
+            color: color.withValues(alpha: 0.6),
+            blurRadius: 28,
+            spreadRadius: 4,
+          ),
         ],
       ),
     );

@@ -12,7 +12,8 @@ class BoardPoint {
   bool get isCenter => col == 2 && row == 2;
 
   @override
-  bool operator ==(Object other) => other is BoardPoint && other.col == col && other.row == row;
+  bool operator ==(Object other) =>
+      other is BoardPoint && other.col == col && other.row == row;
 
   @override
   int get hashCode => Object.hash(col, row);
@@ -37,12 +38,11 @@ class BoardGraph {
 
   static List<int> neighborsOf(BoardPoint p) => _adjacency[p.index] ?? const [];
 
-  static bool areAdjacent(BoardPoint a, BoardPoint b) => neighborsOf(a).contains(b.index);
+  static bool areAdjacent(BoardPoint a, BoardPoint b) =>
+      neighborsOf(a).contains(b.index);
 
   static Map<int, List<int>> _buildAdjacency() {
-    final adj = <int, Set<int>>{
-      for (final p in points) p.index: <int>{},
-    };
+    final adj = <int, Set<int>>{for (final p in points) p.index: <int>{}};
 
     void link(BoardPoint a, BoardPoint b) {
       adj[a.index]!.add(b.index);

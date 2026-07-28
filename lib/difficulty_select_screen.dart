@@ -23,8 +23,8 @@ class DifficultySelectScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
-        iconTheme: const IconThemeData(color: AppColors.textPrimary),
-        title: const Text(
+        iconTheme: IconThemeData(color: AppColors.textPrimary),
+        title: Text(
           'SELECT DIFFICULTY',
           style: TextStyle(
             color: AppColors.textPrimary,
@@ -41,9 +41,13 @@ class DifficultySelectScreen extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text(
+              Text(
                 'Choose how sharp the AI plays.',
-                style: TextStyle(color: AppColors.textMuted, fontSize: 13, letterSpacing: 0.5),
+                style: TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 13,
+                  letterSpacing: 0.5,
+                ),
               ),
               const SizedBox(height: 32),
               AnimatedPressButton(

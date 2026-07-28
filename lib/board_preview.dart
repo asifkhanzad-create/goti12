@@ -12,7 +12,8 @@ class BoardPreview extends StatefulWidget {
   State<BoardPreview> createState() => _BoardPreviewState();
 }
 
-class _BoardPreviewState extends State<BoardPreview> with SingleTickerProviderStateMixin {
+class _BoardPreviewState extends State<BoardPreview>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
 
   // 10 pieces sitting on the real grid points: full top row = AI (amber),
@@ -76,7 +77,8 @@ class _PreviewPoint {
   final double dx; // 0..1 fraction of width
   final double dy; // 0..1 fraction of height
   final bool isPlayer;
-  final double phase; // offsets each piece's animation so they don't move in sync
+  final double
+  phase; // offsets each piece's animation so they don't move in sync
 }
 
 class _BoardPreviewPainter extends CustomPainter {
@@ -102,7 +104,8 @@ class _BoardPreviewPainter extends CustomPainter {
     final w = right - left;
     final h = bottom - top;
 
-    Offset gridPoint(int col, int row) => Offset(left + w * (col / 4), top + h * (row / 4));
+    Offset gridPoint(int col, int row) =>
+        Offset(left + w * (col / 4), top + h * (row / 4));
 
     // 5 vertical + 5 horizontal grid lines
     for (var col = 0; col <= 4; col++) {
@@ -119,8 +122,16 @@ class _BoardPreviewPainter extends CustomPainter {
       for (var blockRow = 0; blockRow < 2; blockRow++) {
         final c0 = blockCol * 2;
         final r0 = blockRow * 2;
-        canvas.drawLine(gridPoint(c0, r0), gridPoint(c0 + 2, r0 + 2), linePaint);
-        canvas.drawLine(gridPoint(c0 + 2, r0), gridPoint(c0, r0 + 2), linePaint);
+        canvas.drawLine(
+          gridPoint(c0, r0),
+          gridPoint(c0 + 2, r0 + 2),
+          linePaint,
+        );
+        canvas.drawLine(
+          gridPoint(c0 + 2, r0),
+          gridPoint(c0, r0 + 2),
+          linePaint,
+        );
       }
     }
 
@@ -128,12 +139,10 @@ class _BoardPreviewPainter extends CustomPainter {
       // each piece floats on its own offset sine wave so they feel organic, not synced
       final wave = _loopingSine(t, p.phase);
       final floatOffset = wave * 4; // px of vertical float
-      final glowPulse = 0.5 + (wave.abs() * 0.5); // glow breathes between 0.5 and 1.0
+      final glowPulse =
+          0.5 + (wave.abs() * 0.5); // glow breathes between 0.5 and 1.0
 
-      final center = Offset(
-        left + w * p.dx,
-        top + h * p.dy + floatOffset,
-      );
+      final center = Offset(left + w * p.dx, top + h * p.dy + floatOffset);
 
       final baseColor = p.isPlayer ? AppColors.playerStart : AppColors.aiStart;
 

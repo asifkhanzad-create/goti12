@@ -4,10 +4,12 @@ import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'animated_press_button.dart';
 import 'app_colors.dart';
+import 'game_theme.dart';
 import 'board_point.dart';
 import 'game_state.dart';
 import 'ai_engine.dart';
 import 'sound_manager.dart';
+
 /// The real, interactive 12 Goti board, driven by [GameState].
 ///
 /// Every move — player or AI, plain or multi-hop capture chain — plays out
@@ -24,8 +26,8 @@ class GameBoardScreen extends StatefulWidget {
 
   /// Hot-seat local: both teal and amber are human-controlled.
   const GameBoardScreen.local({super.key, this.firstTurn = Owner.player})
-      : difficulty = null,
-        isLocal = true;
+    : difficulty = null,
+      isLocal = true;
 
   final Difficulty? difficulty;
   final bool isLocal;
@@ -35,7 +37,8 @@ class GameBoardScreen extends StatefulWidget {
   State<GameBoardScreen> createState() => _GameBoardScreenState();
 }
 
-class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderStateMixin {
+class _GameBoardScreenState extends State<GameBoardScreen>
+    with TickerProviderStateMixin {
   late GameState _state;
   AiEngine? _aiEngine;
   int? _selectedIndex;
@@ -46,10 +49,13 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
   late final AnimationController _hopController;
   late final ConfettiController _confettiController;
   late final AnimationController _shakeController;
+
   /// Duration for one orthogonal grid step (distance 1.0). Longer hops
   /// scale from this with a mild distance factor (see [_hopDurationFor]).
   static const _unitHopDuration = Duration(milliseconds: 350);
-  static const _aiChainGap = Duration(milliseconds: 200); // beat between chained AI kills
+  static const _aiChainGap = Duration(
+    milliseconds: 200,
+  ); // beat between chained AI kills
 
   // Mid-hop animation state: the piece currently sliding, and any pieces
   // fading out as captured on this specific hop. Rendering reads these
@@ -83,8 +89,13 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
     if (!widget.isLocal) {
       _aiEngine = AiEngine(widget.difficulty!);
     }
-    _hopController = AnimationController(vsync: this, duration: _unitHopDuration);
-    _confettiController = ConfettiController(duration: const Duration(seconds: 3));
+    _hopController = AnimationController(
+      vsync: this,
+      duration: _unitHopDuration,
+    );
+    _confettiController = ConfettiController(
+      duration: const Duration(seconds: 3),
+    );
     _shakeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 420),
@@ -282,7 +293,7 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
         SoundManager.instance.playWin();
         _confettiController.play();
         setState(() {});
-            case GamePhase.aiWon:
+      case GamePhase.aiWon:
         _endFxPlayed = true;
         if (widget.isLocal) {
           SoundManager.instance.playWin();
@@ -401,254 +412,275 @@ class _GameBoardScreenState extends State<GameBoardScreen> with TickerProviderSt
 
     return PopScope(
       canPop: false,
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
         _openPauseMenu();
       },
       child: Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.background,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: AppColors.textPrimary),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: _openPauseMenu,
-        ),
-        title: const Text(
-          'PLAY',
-          style: TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 2,
+        backgroundColor: GameThemeManager.current.background,
+        appBar: AppBar(
+          backgroundColor: GameThemeManager.current.background,
+          elevation: 0,
+          iconTheme: IconThemeData(color: AppColors.textPrimary),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: _openPauseMenu,
           ),
+          title: Text(
+            'PLAY',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 2,
+            ),
+          ),
+          centerTitle: true,
         ),
-        centerTitle: true,
-      ),
-      body: Stack(
-        children: [
-          SafeArea(
-            child: Column(
-              children: [
-                const SizedBox(height: 8),
-                // Banner stays above the lose dim so "YOU LOST" stays readable.
-                _StatusBanner(state: _state, isLocal: widget.isLocal),
-                Expanded(
-                  child: Column(
-                    children: [
-                      Expanded(
-                        child: Stack(
-                          children: [
-                            // Board area — shakes on loss.
-                            AnimatedBuilder(
-                              animation: _shakeController,
-                              builder: (context, child) {
-                                final t = _shakeController.value;
-                                final dx = lost && t > 0 && t < 1
-                                    ? math.sin(t * math.pi * 6) * 10 * (1 - t)
-                                    : 0.0;
-                                return Transform.translate(
-                                  offset: Offset(dx, 0),
-                                  child: child,
-                                );
-                              },
-                              child: Center(
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 20,
-                                  ),
-                                  child: AspectRatio(
-                                    aspectRatio: 1,
-                                    child: LayoutBuilder(
-                                      builder: (context, constraints) {
-                                        final boardSize = constraints.maxWidth;
-                                        return Stack(
-                                          clipBehavior: Clip.none,
-                                          children: [
-                                            RepaintBoundary(
-                                              child: CustomPaint(
-                                                size: Size(
-                                                  boardSize,
-                                                  boardSize,
+        body: Stack(
+          children: [
+            if (GameThemeManager.current.hasScenery)
+              Positioned.fill(
+                child: CustomPaint(painter: _ClassicSceneryPainter()),
+              ),
+            SafeArea(
+              child: Column(
+                children: [
+                  const SizedBox(height: 8),
+                  // Banner stays above the lose dim so "YOU LOST" stays readable.
+                  _StatusBanner(state: _state, isLocal: widget.isLocal),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        Expanded(
+                          child: Stack(
+                            children: [
+                              // Board area — shakes on loss.
+                              AnimatedBuilder(
+                                animation: _shakeController,
+                                builder: (context, child) {
+                                  final t = _shakeController.value;
+                                  final dx = lost && t > 0 && t < 1
+                                      ? math.sin(t * math.pi * 6) * 10 * (1 - t)
+                                      : 0.0;
+                                  return Transform.translate(
+                                    offset: Offset(dx, 0),
+                                    child: child,
+                                  );
+                                },
+                                child: Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 20,
+                                    ),
+                                    child: AspectRatio(
+                                      aspectRatio: 1,
+                                      child: LayoutBuilder(
+                                        builder: (context, constraints) {
+                                          final boardSize =
+                                              constraints.maxWidth;
+                                          return Stack(
+                                            clipBehavior: Clip.none,
+                                            children: [
+                                              RepaintBoundary(
+                                                child: CustomPaint(
+                                                  size: Size(
+                                                    boardSize,
+                                                    boardSize,
+                                                  ),
+                                                  painter: _BoardLinesPainter(
+                                                    GameThemeManager.current,
+                                                  ),
                                                 ),
-                                                painter: _BoardLinesPainter(),
                                               ),
-                                            ),
-                                            // Static points — only rebuilds on actual state / selection changes
-                                            for (final p in BoardGraph.points)
-                                              _PositionedPoint(
-                                                key: ValueKey(p.index),
-                                                point: p,
-                                                size: boardSize,
-                                                owner: (p.index == _animFrom || _animCaptured.contains(p.index))
-                                                    ? null
-                                                    : _state.ownerAt(p.index),
-                                                isSelected: _selectedIndex == p.index,
-                                                fadeProgress: 0.0,
-                                                onTap: () => _onPointTap(p.index),
+                                              // Static points — only rebuilds on actual state / selection changes
+                                              for (final p in BoardGraph.points)
+                                                _PositionedPoint(
+                                                  key: ValueKey(p.index),
+                                                  point: p,
+                                                  size: boardSize,
+                                                  owner:
+                                                      (p.index == _animFrom ||
+                                                          _animCaptured
+                                                              .contains(
+                                                                p.index,
+                                                              ))
+                                                      ? null
+                                                      : _state.ownerAt(p.index),
+                                                  isSelected:
+                                                      _selectedIndex == p.index,
+                                                  fadeProgress: 0.0,
+                                                  onTap: () =>
+                                                      _onPointTap(p.index),
+                                                ),
+                                              // Isolated animation layer — updates on hopController frame ticks
+                                              AnimatedBuilder(
+                                                animation: _hopController,
+                                                builder: (context, _) {
+                                                  final t =
+                                                      _hopController.value;
+                                                  return Stack(
+                                                    clipBehavior: Clip.none,
+                                                    children: [
+                                                      for (final capIdx
+                                                          in _animCaptured)
+                                                        _CapturedFadeOverlay(
+                                                          point: BoardGraph
+                                                              .points[capIdx],
+                                                          size: boardSize,
+                                                          owner: _state.ownerAt(
+                                                            capIdx,
+                                                          ),
+                                                          progress: t,
+                                                        ),
+                                                      if (_animFrom != null &&
+                                                          _animOwner != null)
+                                                        _SlidingPiece(
+                                                          from: BoardPoint(
+                                                            _animFrom! % 5,
+                                                            _animFrom! ~/ 5,
+                                                          ),
+                                                          to: BoardPoint(
+                                                            _animTo! % 5,
+                                                            _animTo! ~/ 5,
+                                                          ),
+                                                          boardSize: boardSize,
+                                                          owner: _animOwner!,
+                                                          progress: t,
+                                                        ),
+                                                    ],
+                                                  );
+                                                },
                                               ),
-                                            // Isolated animation layer — updates on hopController frame ticks
-                                            AnimatedBuilder(
-                                              animation: _hopController,
-                                              builder: (context, _) {
-                                                final t = _hopController.value;
-                                                return Stack(
-                                                  clipBehavior: Clip.none,
-                                                  children: [
-                                                    for (final capIdx in _animCaptured)
-                                                      _CapturedFadeOverlay(
-                                                        point: BoardGraph.points[capIdx],
-                                                        size: boardSize,
-                                                        owner: _state.ownerAt(capIdx),
-                                                        progress: t,
-                                                      ),
-                                                    if (_animFrom != null && _animOwner != null)
-                                                      _SlidingPiece(
-                                                        from: BoardPoint(
-                                                          _animFrom! % 5,
-                                                          _animFrom! ~/ 5,
-                                                        ),
-                                                        to: BoardPoint(
-                                                          _animTo! % 5,
-                                                          _animTo! ~/ 5,
-                                                        ),
-                                                        boardSize: boardSize,
-                                                        owner: _animOwner!,
-                                                        progress: t,
-                                                      ),
-                                                  ],
-                                                );
-                                              },
-                                            ),
-                                          ],
-                                        );
-                                      },
+                                            ],
+                                          );
+                                        },
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
-                            ),
 
-                            // Dim the board area when the player loses.
-                            if (lost)
-                              IgnorePointer(
-                                child: Container(
-                                  color: AppColors.background.withValues(
-                                    alpha: 0.55,
+                              // Dim the board area when the player loses.
+                              if (lost)
+                                IgnorePointer(
+                                  child: Container(
+                                    color: GameThemeManager.current.background
+                                        .withValues(alpha: 0.55),
                                   ),
                                 ),
-                              ),
-                          ],
-                        ),
-                      ),
-
-                      // End-game actions — only after win/lose, under the board.
-                      if (_isEndgame)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(24, 0, 24, 64),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              AnimatedPressButton(
-                                label: 'Play again',
-                                gradient: AppColors.playerGradient,
-                                textColor: AppColors.playerDeep,
-                                glowColor: AppColors.playerStart,
-                                onTap: _playAgain,
-                              ),
-                              const SizedBox(height: 12),
-                              AnimatedPressButton(
-                                label: widget.isLocal
-                                    ? 'Back to menu'
-                                    : 'Change difficulty',
-                                gradient: AppColors.aiGradient,
-                                textColor: AppColors.aiDeep,
-                                glowColor: AppColors.aiStart,
-                                onTap: _popToPrevious,
-                              ),
                             ],
                           ),
                         ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
 
-          // Full-screen confetti when the player wins (non-blocking).
-          Align(
-            alignment: Alignment.topCenter,
-            child: IgnorePointer(
-              child: ConfettiWidget(
-                confettiController: _confettiController,
-                blastDirectionality: BlastDirectionality.explosive,
-                emissionFrequency: 0.08,
-                numberOfParticles: 22,
-                maxBlastForce: 28,
-                minBlastForce: 10,
-                gravity: 0.18,
-                shouldLoop: false,
-                colors: const [
-                  AppColors.playerStart,
-                  AppColors.playerEnd,
-                  AppColors.aiStart,
-                  Colors.white,
-                  Color(0xFFA78BFA),
+                        // End-game actions — only after win/lose, under the board.
+                        if (_isEndgame)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(24, 0, 24, 64),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                AnimatedPressButton(
+                                  label: 'Play again',
+                                  gradient: AppColors.playerGradient,
+                                  textColor: AppColors.playerDeep,
+                                  glowColor: AppColors.playerStart,
+                                  onTap: _playAgain,
+                                ),
+                                const SizedBox(height: 12),
+                                AnimatedPressButton(
+                                  label: widget.isLocal
+                                      ? 'Back to menu'
+                                      : 'Change difficulty',
+                                  gradient: AppColors.aiGradient,
+                                  textColor: AppColors.aiDeep,
+                                  glowColor: AppColors.aiStart,
+                                  onTap: _popToPrevious,
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
-          ),
 
-          // Pause overlay — blocks the board underneath and offers
-          // Resume / Quit, same button theme as the endgame actions.
-          if (_paused)
-            Positioned.fill(
-              child: Container(
-                color: AppColors.background.withValues(alpha: 0.88),
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text(
-                        'PAUSED',
-                        style: TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 3,
-                        ),
-                      ),
-                      const SizedBox(height: 32),
-                      SizedBox(
-                        width: 220,
-                        child: AnimatedPressButton(
-                          label: 'Resume',
-                          gradient: AppColors.playerGradient,
-                          textColor: AppColors.playerDeep,
-                          glowColor: AppColors.playerStart,
-                          onTap: _resume,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: 220,
-                        child: AnimatedPressButton(
-                          label: 'Quit game',
-                          gradient: AppColors.aiGradient,
-                          textColor: AppColors.aiDeep,
-                          glowColor: AppColors.aiStart,
-                          onTap: _quitGame,
-                        ),
-                      ),
-                    ],
-                  ),
+            // Full-screen confetti when the player wins (non-blocking).
+            Align(
+              alignment: Alignment.topCenter,
+              child: IgnorePointer(
+                child: ConfettiWidget(
+                  confettiController: _confettiController,
+                  blastDirectionality: BlastDirectionality.explosive,
+                  emissionFrequency: 0.08,
+                  numberOfParticles: 22,
+                  maxBlastForce: 28,
+                  minBlastForce: 10,
+                  gravity: 0.18,
+                  shouldLoop: false,
+                  colors: [
+                    AppColors.playerStart,
+                    AppColors.playerEnd,
+                    AppColors.aiStart,
+                    Colors.white,
+                    Color(0xFFA78BFA),
+                  ],
                 ),
               ),
             ),
-        ],
-      ),
+
+            // Pause overlay — blocks the board underneath and offers
+            // Resume / Quit, same button theme as the endgame actions.
+            if (_paused)
+              Positioned.fill(
+                child: Container(
+                  color: GameThemeManager.current.background.withValues(
+                    alpha: 0.88,
+                  ),
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'PAUSED',
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 3,
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+                        SizedBox(
+                          width: 220,
+                          child: AnimatedPressButton(
+                            label: 'Resume',
+                            gradient: AppColors.playerGradient,
+                            textColor: AppColors.playerDeep,
+                            glowColor: AppColors.playerStart,
+                            onTap: _resume,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: 220,
+                          child: AnimatedPressButton(
+                            label: 'Quit game',
+                            gradient: AppColors.aiGradient,
+                            textColor: AppColors.aiDeep,
+                            glowColor: AppColors.aiStart,
+                            onTap: _quitGame,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -660,10 +692,7 @@ Offset boardPointCenter(BoardPoint point, double size) {
   const margin = 0.06;
   final left = size * margin;
   final span = size * (1 - 2 * margin);
-  return Offset(
-    left + span * (point.col / 4),
-    left + span * (point.row / 4),
-  );
+  return Offset(left + span * (point.col / 4), left + span * (point.row / 4));
 }
 
 class _StatusBanner extends StatefulWidget {
@@ -719,10 +748,9 @@ class _StatusBannerState extends State<_StatusBanner>
   void didUpdateWidget(covariant _StatusBanner oldWidget) {
     super.didUpdateWidget(oldWidget);
     final phase = widget.state.phase;
-    final wasEnd = _lastPhase == GamePhase.playerWon ||
-        _lastPhase == GamePhase.aiWon;
-    final isEnd =
-        phase == GamePhase.playerWon || phase == GamePhase.aiWon;
+    final wasEnd =
+        _lastPhase == GamePhase.playerWon || _lastPhase == GamePhase.aiWon;
+    final isEnd = phase == GamePhase.playerWon || phase == GamePhase.aiWon;
 
     if (isEnd && !wasEnd) {
       _startEndgameAnim();
@@ -915,8 +943,11 @@ class _SlidingPiece extends StatelessWidget {
     final end = boardPointCenter(to, boardSize);
     final curved = Curves.easeInOut.transform(progress);
     final center = Offset.lerp(start, end, curved)!;
-    const pieceSize = 24.0;
-    final baseColor = owner == Owner.player ? AppColors.playerStart : AppColors.aiStart;
+    final theme = GameThemeManager.current;
+    final pieceSize = 24.0 * theme.pieceScale;
+    final baseColor = owner == Owner.player
+        ? GameThemeManager.current.player
+        : GameThemeManager.current.opponent;
 
     return Positioned(
       left: center.dx - pieceSize / 2,
@@ -928,9 +959,17 @@ class _SlidingPiece extends StatelessWidget {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: baseColor,
-            boxShadow: owner == Owner.player
-                ? const [_playerSlidingShadow]
-                : const [_aiSlidingShadow],
+            border: Border.all(
+              color: Colors.white.withValues(alpha: theme.pieceRimAlpha),
+              width: theme.pieceScale > 1 ? 1.25 : 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: baseColor.withValues(alpha: 0.5 * theme.pieceGlow),
+                blurRadius: 14 * theme.pieceGlow,
+                spreadRadius: 2 * theme.pieceGlow,
+              ),
+            ],
           ),
         ),
       ),
@@ -938,41 +977,30 @@ class _SlidingPiece extends StatelessWidget {
   }
 }
 
-const _playerSlidingShadow = BoxShadow(
-  color: Color(0x8014B8A6), // AppColors.playerStart with 0.5 alpha
-  blurRadius: 14,
-  spreadRadius: 2,
-);
-
-const _aiSlidingShadow = BoxShadow(
-  color: Color(0x80F59E0B), // AppColors.aiStart with 0.5 alpha
-  blurRadius: 14,
-  spreadRadius: 2,
-);
-
-const _playerPieceDecoration = BoxDecoration(
-  shape: BoxShape.circle,
-  color: AppColors.playerStart,
-  boxShadow: [
-    BoxShadow(
-      color: Color(0x5914B8A6), // AppColors.playerStart with 0.35 alpha
-      blurRadius: 10,
-      spreadRadius: 1,
+BoxDecoration _pieceDecoration(Owner owner) {
+  final theme = GameThemeManager.current;
+  final color = owner == Owner.player ? theme.player : theme.opponent;
+  final shade = owner == Owner.player ? theme.playerShade : theme.opponentShade;
+  return BoxDecoration(
+    shape: BoxShape.circle,
+    gradient: LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [color, shade],
     ),
-  ],
-);
-
-const _aiPieceDecoration = BoxDecoration(
-  shape: BoxShape.circle,
-  color: AppColors.aiStart,
-  boxShadow: [
-    BoxShadow(
-      color: Color(0x59F59E0B), // AppColors.aiStart with 0.35 alpha
-      blurRadius: 10,
-      spreadRadius: 1,
+    border: Border.all(
+      color: Colors.white.withValues(alpha: theme.pieceRimAlpha),
+      width: theme.pieceScale > 1 ? 1.25 : 1,
     ),
-  ],
-);
+    boxShadow: [
+      BoxShadow(
+        color: color.withValues(alpha: .4 * theme.pieceGlow),
+        blurRadius: 10 * theme.pieceGlow,
+        spreadRadius: theme.pieceScale > 1 ? 1.5 : 1,
+      ),
+    ],
+  );
+}
 
 class _Piece extends StatefulWidget {
   const _Piece({required this.owner, required this.isSelected});
@@ -1019,20 +1047,18 @@ class _PieceState extends State<_Piece> with SingleTickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     if (!widget.isSelected) {
-      final decor = widget.owner == Owner.player
-          ? _playerPieceDecoration
-          : _aiPieceDecoration;
+      final decor = _pieceDecoration(widget.owner);
+      final size = 18.0 * GameThemeManager.current.pieceScale;
       return Center(
-        child: Container(
-          width: 18,
-          height: 18,
-          decoration: decor,
-        ),
+        child: Container(width: size, height: size, decoration: decor),
       );
     }
 
-    final baseColor = widget.owner == Owner.player ? AppColors.playerStart : AppColors.aiStart;
+    final baseColor = widget.owner == Owner.player
+        ? GameThemeManager.current.player
+        : GameThemeManager.current.opponent;
 
+    final theme = GameThemeManager.current;
     return AnimatedBuilder(
       animation: _pulseController,
       builder: (context, _) {
@@ -1043,16 +1069,22 @@ class _PieceState extends State<_Piece> with SingleTickerProviderStateMixin {
           child: Transform.scale(
             scale: scale,
             child: Container(
-              width: 24,
-              height: 24,
+              width: 24 * theme.pieceScale,
+              height: 24 * theme.pieceScale,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: baseColor,
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: theme.pieceRimAlpha),
+                  width: theme.pieceScale > 1 ? 1.25 : 1,
+                ),
                 boxShadow: [
                   BoxShadow(
-                    color: baseColor.withValues(alpha: glowAlpha),
-                    blurRadius: 18,
-                    spreadRadius: 3,
+                    color: baseColor.withValues(
+                      alpha: glowAlpha * theme.pieceGlow,
+                    ),
+                    blurRadius: 18 * theme.pieceGlow,
+                    spreadRadius: 3 * theme.pieceGlow,
                   ),
                 ],
               ),
@@ -1064,12 +1096,91 @@ class _PieceState extends State<_Piece> with SingleTickerProviderStateMixin {
   }
 }
 
+class _ClassicSceneryPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()..color = GameThemeManager.current.background,
+    );
+    canvas.save();
+    final horizon = size.height * .62;
+    final mist = Paint()
+      ..color = const Color(0xFFB8E7D3).withValues(alpha: .12);
+    canvas.drawCircle(
+      Offset(size.width * .7, size.height * .28),
+      size.width * .28,
+      mist,
+    );
+    Path mountain(Color color, double peakX, double peakY, double baseY) =>
+        Path()
+          ..moveTo(0, baseY)
+          ..lineTo(size.width * peakX, peakY)
+          ..lineTo(size.width, baseY)
+          ..close();
+    canvas.drawPath(
+      mountain(
+        const Color(0xFF124F67).withValues(alpha: .85),
+        .24,
+        size.height * .32,
+        horizon,
+      ),
+      Paint()..color = const Color(0xFF124F67).withValues(alpha: .85),
+    );
+    canvas.drawPath(
+      mountain(
+        const Color(0xFF0C425C).withValues(alpha: .9),
+        .76,
+        size.height * .39,
+        horizon,
+      ),
+      Paint()..color = const Color(0xFF0C425C).withValues(alpha: .9),
+    );
+    final forest = Paint()
+      ..color = const Color(0xFF092F4B).withValues(alpha: .82);
+    for (var x = -8.0; x < size.width + 12; x += size.width / 9) {
+      final h = size.height * (.10 + ((x ~/ 10) % 3) * .025);
+      final y = size.height - h;
+      canvas.drawPath(
+        Path()
+          ..moveTo(x, size.height)
+          ..lineTo(x + 9, y)
+          ..lineTo(x + 18, size.height)
+          ..close(),
+        forest,
+      );
+    }
+    final lake = Paint()
+      ..color = const Color(0xFFBDE9EA).withValues(alpha: .12);
+    canvas.drawRect(
+      Rect.fromLTWH(0, horizon, size.width, size.height * .2),
+      lake,
+    );
+    final spark = Paint()
+      ..color = const Color(0xFFFFE99A).withValues(alpha: .55);
+    for (final point in [
+      Offset(size.width * .2, size.height * .53),
+      Offset(size.width * .78, size.height * .45),
+      Offset(size.width * .68, size.height * .66),
+      Offset(size.width * .39, size.height * .58),
+    ]) {
+      canvas.drawCircle(point, 1.7, spark);
+    }
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _ClassicSceneryPainter oldDelegate) => false;
+}
+
 class _BoardLinesPainter extends CustomPainter {
+  _BoardLinesPainter(this.theme);
+  final GameBoardTheme theme;
   @override
   void paint(Canvas canvas, Size size) {
     final linePaint = Paint()
-      ..color = AppColors.boardLine
-      ..strokeWidth = 1.5
+      ..color = theme.boardLine
+      ..strokeWidth = theme.lineWidth
       ..style = PaintingStyle.stroke;
 
     const margin = 0.06;
@@ -1080,7 +1191,8 @@ class _BoardLinesPainter extends CustomPainter {
     final w = right - left;
     final h = bottom - top;
 
-    Offset gridPoint(int col, int row) => Offset(left + w * (col / 4), top + h * (row / 4));
+    Offset gridPoint(int col, int row) =>
+        Offset(left + w * (col / 4), top + h * (row / 4));
 
     for (var col = 0; col <= 4; col++) {
       canvas.drawLine(gridPoint(col, 0), gridPoint(col, 4), linePaint);
@@ -1093,14 +1205,23 @@ class _BoardLinesPainter extends CustomPainter {
       for (var blockRow = 0; blockRow < 2; blockRow++) {
         final c0 = blockCol * 2;
         final r0 = blockRow * 2;
-        canvas.drawLine(gridPoint(c0, r0), gridPoint(c0 + 2, r0 + 2), linePaint);
-        canvas.drawLine(gridPoint(c0 + 2, r0), gridPoint(c0, r0 + 2), linePaint);
+        canvas.drawLine(
+          gridPoint(c0, r0),
+          gridPoint(c0 + 2, r0 + 2),
+          linePaint,
+        );
+        canvas.drawLine(
+          gridPoint(c0 + 2, r0),
+          gridPoint(c0, r0 + 2),
+          linePaint,
+        );
       }
     }
 
-    canvas.drawCircle(gridPoint(2, 2), 3, Paint()..color = AppColors.boardCenterDot);
+    canvas.drawCircle(gridPoint(2, 2), 3, Paint()..color = theme.centerDot);
   }
 
   @override
-  bool shouldRepaint(covariant _BoardLinesPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _BoardLinesPainter oldDelegate) =>
+      oldDelegate.theme.id != theme.id;
 }

@@ -35,7 +35,7 @@ class HomeScreen extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const _TitleBlock(),
+                  _TitleBlock(),
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 12),
                     child: BoardPreview(),
@@ -49,7 +49,9 @@ class HomeScreen extends StatelessWidget {
                         glowColor: AppColors.playerStart,
                         onTap: () {
                           Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => const DifficultySelectScreen()),
+                            MaterialPageRoute(
+                              builder: (_) => const DifficultySelectScreen(),
+                            ),
                           );
                         },
                       ),
@@ -122,7 +124,7 @@ class _TitleBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        const Text(
+        Text(
           '12 GOTI',
           style: TextStyle(
             color: AppColors.textPrimary,
@@ -132,7 +134,7 @@ class _TitleBlock extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 6),
-        const Text(
+        Text(
           'STRATEGY BOARD GAME',
           style: TextStyle(
             color: AppColors.textMuted,
@@ -171,7 +173,13 @@ class _BrandDot extends StatelessWidget {
         color: color,
         shape: BoxShape.circle,
         boxShadow: glow
-            ? [BoxShadow(color: color.withValues(alpha: 0.6), blurRadius: 12, spreadRadius: 1)]
+            ? [
+                BoxShadow(
+                  color: color.withValues(alpha: 0.6),
+                  blurRadius: 12,
+                  spreadRadius: 1,
+                ),
+              ]
             : null,
       ),
     );

@@ -7,10 +7,7 @@ enum Difficulty { easy, medium, hard, master }
 
 /// Serializable snapshot of the board for isolate transfer.
 class AiBoardSnapshot {
-  const AiBoardSnapshot({
-    required this.cells,
-    required this.turnIsAi,
-  });
+  const AiBoardSnapshot({required this.cells, required this.turnIsAi});
 
   /// Length 25: 0 = empty, 1 = player, 2 = ai.
   final List<int> cells;
@@ -26,16 +23,10 @@ class AiBoardSnapshot {
         cells[e.key] = 2;
       }
     }
-    return AiBoardSnapshot(
-      cells: cells,
-      turnIsAi: state.turn == Owner.ai,
-    );
+    return AiBoardSnapshot(cells: cells, turnIsAi: state.turn == Owner.ai);
   }
 
-  Map<String, Object?> toJson() => {
-        'cells': cells,
-        'turnIsAi': turnIsAi,
-      };
+  Map<String, Object?> toJson() => {'cells': cells, 'turnIsAi': turnIsAi};
 
   factory AiBoardSnapshot.fromJson(Map<String, Object?> json) {
     return AiBoardSnapshot(
@@ -58,10 +49,10 @@ class AiChooseRequest {
   final int? seed;
 
   Map<String, Object?> toJson() => {
-        'difficultyIndex': difficultyIndex,
-        'snapshot': snapshot.toJson(),
-        'seed': seed,
-      };
+    'difficultyIndex': difficultyIndex,
+    'snapshot': snapshot.toJson(),
+    'seed': seed,
+  };
 
   factory AiChooseRequest.fromJson(Map<String, Object?> json) {
     return AiChooseRequest(
@@ -89,11 +80,11 @@ class AiMovePayload {
   final List<AiStepPayload> steps;
 
   Map<String, Object?> toJson() => {
-        'from': from,
-        'to': to,
-        'captured': captured,
-        'steps': steps.map((s) => s.toJson()).toList(),
-      };
+    'from': from,
+    'to': to,
+    'captured': captured,
+    'steps': steps.map((s) => s.toJson()).toList(),
+  };
 
   factory AiMovePayload.fromJson(Map<String, Object?> json) {
     final stepList = (json['steps'] as List?) ?? const [];
@@ -102,28 +93,28 @@ class AiMovePayload {
       to: json['to']! as int,
       captured: List<int>.from(json['captured']! as List),
       steps: stepList
-          .map((s) => AiStepPayload.fromJson(Map<String, Object?>.from(s as Map)))
+          .map(
+            (s) => AiStepPayload.fromJson(Map<String, Object?>.from(s as Map)),
+          )
           .toList(),
     );
   }
 
   Move toMove() => Move(
-        from: from,
-        to: to,
-        captured: captured,
-        steps: steps
-            .map((s) => MoveStep(to: s.to, captured: s.captured))
-            .toList(),
-      );
+    from: from,
+    to: to,
+    captured: captured,
+    steps: steps.map((s) => MoveStep(to: s.to, captured: s.captured)).toList(),
+  );
 
   static AiMovePayload fromMove(Move m) => AiMovePayload(
-        from: m.from,
-        to: m.to,
-        captured: m.captured,
-        steps: m.effectiveSteps
-            .map((s) => AiStepPayload(to: s.to, captured: s.captured))
-            .toList(),
-      );
+    from: m.from,
+    to: m.to,
+    captured: m.captured,
+    steps: m.effectiveSteps
+        .map((s) => AiStepPayload(to: s.to, captured: s.captured))
+        .toList(),
+  );
 }
 
 class AiStepPayload {
@@ -135,9 +126,9 @@ class AiStepPayload {
   Map<String, Object?> toJson() => {'to': to, 'captured': captured};
 
   factory AiStepPayload.fromJson(Map<String, Object?> json) => AiStepPayload(
-        to: json['to']! as int,
-        captured: List<int>.from(json['captured']! as List),
-      );
+    to: json['to']! as int,
+    captured: List<int>.from(json['captured']! as List),
+  );
 }
 
 /// Top-level isolate entry — only JSON-like maps cross the isolate boundary.
@@ -318,7 +309,9 @@ class AiEngine {
     bool checkTime,
   ) {
     // Sample the clock only every so often — DateTime.now() every node is costly.
-    if (checkTime && (++_nodes & 255) == 0 && DateTime.now().isAfter(deadline)) {
+    if (checkTime &&
+        (++_nodes & 255) == 0 &&
+        DateTime.now().isAfter(deadline)) {
       return null;
     }
 
@@ -386,11 +379,15 @@ class AiEngine {
   }
 
   double _evaluate(_SearchBoard board, int me) {
-    final opp = me == _SearchBoard.player ? _SearchBoard.ai : _SearchBoard.player;
-    final myPieces =
-        me == _SearchBoard.player ? board.playerCount : board.aiCount;
-    final oppPieces =
-        opp == _SearchBoard.player ? board.playerCount : board.aiCount;
+    final opp = me == _SearchBoard.player
+        ? _SearchBoard.ai
+        : _SearchBoard.player;
+    final myPieces = me == _SearchBoard.player
+        ? board.playerCount
+        : board.aiCount;
+    final oppPieces = opp == _SearchBoard.player
+        ? board.playerCount
+        : board.aiCount;
     var score = (myPieces - oppPieces) * 10.0;
 
     if (_useMobility) {
@@ -574,7 +571,9 @@ class _SearchBoard {
     final neighbors = BoardGraph.neighborsOf(BoardPoint(from % 5, from ~/ 5));
     for (final n in neighbors) {
       if (cells[n] == empty) {
-        out.add(_SearchMove(from: from, to: n, captured: const [], steps: const []));
+        out.add(
+          _SearchMove(from: from, to: n, captured: const [], steps: const []),
+        );
       }
     }
     // Seed chain exploration from each single capture off [from].
@@ -589,7 +588,9 @@ class _SearchBoard {
         jump.to,
         owner,
         [jump.capturedSingle],
-        [_SearchStep(to: jump.to, captured: [jump.capturedSingle])],
+        [
+          _SearchStep(to: jump.to, captured: [jump.capturedSingle]),
+        ],
         from,
         out,
       );
@@ -606,12 +607,14 @@ class _SearchBoard {
     List<_SearchMove> out,
   ) {
     // Stopping after at least one capture is always legal.
-    out.add(_SearchMove(
-      from: originalFrom,
-      to: currentFrom,
-      captured: List<int>.from(capturedSoFar),
-      steps: List<_SearchStep>.from(stepsSoFar),
-    ));
+    out.add(
+      _SearchMove(
+        from: originalFrom,
+        to: currentFrom,
+        captured: List<int>.from(capturedSoFar),
+        steps: List<_SearchStep>.from(stepsSoFar),
+      ),
+    );
 
     final capSet = capturedSoFar.toSet();
     final nextJumps = _singleCapturesOn(
@@ -734,15 +737,8 @@ class _SearchMove {
 
   Move toMove() {
     final moveSteps = steps.isNotEmpty
-        ? steps
-            .map((s) => MoveStep(to: s.to, captured: s.captured))
-            .toList()
+        ? steps.map((s) => MoveStep(to: s.to, captured: s.captured)).toList()
         : [MoveStep(to: to, captured: captured)];
-    return Move(
-      from: from,
-      to: to,
-      captured: captured,
-      steps: moveSteps,
-    );
+    return Move(from: from, to: to, captured: captured, steps: moveSteps);
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_soloud/flutter_soloud.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SoundManager {
   SoundManager._();
@@ -13,11 +14,29 @@ class SoundManager {
   AudioSource? _loseSource;
   bool _initialized = false;
 
-  bool soundEnabled = true;
-  bool hapticsEnabled = true;
+  static const _soundEnabledKey = 'sound_enabled';
+  static const _hapticsEnabledKey = 'haptics_enabled';
+  SharedPreferences? _preferences;
+  bool _soundEnabled = true;
+  bool _hapticsEnabled = true;
+
+  bool get soundEnabled => _soundEnabled;
+  set soundEnabled(bool value) {
+    _soundEnabled = value;
+    _preferences?.setBool(_soundEnabledKey, value);
+  }
+
+  bool get hapticsEnabled => _hapticsEnabled;
+  set hapticsEnabled(bool value) {
+    _hapticsEnabled = value;
+    _preferences?.setBool(_hapticsEnabledKey, value);
+  }
 
   Future<void> init() async {
     if (_initialized) return;
+    _preferences = await SharedPreferences.getInstance();
+    _soundEnabled = _preferences!.getBool(_soundEnabledKey) ?? true;
+    _hapticsEnabled = _preferences!.getBool(_hapticsEnabledKey) ?? true;
     try {
       await SoLoud.instance.init();
       _slideSource = await SoLoud.instance.loadAsset(
