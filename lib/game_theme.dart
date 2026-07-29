@@ -56,9 +56,9 @@ class GameThemes {
     playerShade: Color(0xFF14B8A6),
     opponentShade: Color(0xFFF59E0B),
     lineWidth: 1.5,
-    pieceScale: 1.0,
-    pieceGlow: 1.0,
-    pieceRimAlpha: .28,
+    pieceScale: 1.1,
+    pieceGlow: 1.22,
+    pieceRimAlpha: 0,
   );
   static const royal = GameBoardTheme(
     id: 'royal',
